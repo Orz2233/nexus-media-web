@@ -45,6 +45,7 @@ import { IconifyIcon } from '@vben/icons';
 import * as NaiveUI from 'naive-ui';
 
 import { requestClient } from '#/api/request';
+import PathPickerModal from '#/components/media/PathPickerModal.vue';
 import { router } from '#/router';
 
 const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);
@@ -83,6 +84,7 @@ const host = {
   },
   IconifyIcon,
   NaiveUI,
+  PathPickerModal,
   api: requestClient,
 };
 
