@@ -42,6 +42,8 @@ import {
 import { useAppConfig } from '@vben/hooks';
 import { IconifyIcon } from '@vben/icons';
 
+import * as NaiveUI from 'naive-ui';
+
 import { requestClient } from '#/api/request';
 import { router } from '#/router';
 
@@ -80,6 +82,7 @@ const host = {
     markRaw,
   },
   IconifyIcon,
+  NaiveUI,
   api: requestClient,
 };
 
