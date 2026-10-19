@@ -3,6 +3,7 @@ export * from './brush';
 export * from './dashboard';
 export * from './download';
 export * from './filter';
+export * from './library_rename';
 export * from './media';
 export type { PluginApi } from './plugin';
 export * from './plugin_framework';
