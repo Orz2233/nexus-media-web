@@ -152,9 +152,13 @@ const contentProfiles = reactive<
   >
 >({});
 
+const CORE_PROFILE_LABELS: Record<string, string> = {
+  anime: '动漫',
+};
+
 export function getContentProfileLabel(key?: null | string): string {
   if (!key) return '';
-  return contentProfiles[key]?.label || '';
+  return contentProfiles[key]?.label || CORE_PROFILE_LABELS[key] || '';
 }
 
 export function getContentProfilePresentationType(key?: null | string): string {

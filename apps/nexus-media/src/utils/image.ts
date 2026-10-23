@@ -16,6 +16,9 @@ export function getImgUrl(src?: null | string): string {
   if (src.startsWith('/img/') || src.startsWith('/img?')) return src;
   const tmdbMatch = src.match(/https?:\/\/image\.tmdb\.org\/t\/p\/(\w+)(\/.+)/);
   if (tmdbMatch) return `/img/tmdb/${tmdbMatch[1]}${tmdbMatch[2]}`;
+  if (src.includes('doubanio.com') || src.includes('douban.com'))
+    return `/img/douban/${encodeURIComponent(src)}`;
+  if (src.includes('lain.bgm.tv')) return `/img/bgm/${encodeURIComponent(src)}`;
   return `/img?url=${encodeURIComponent(src)}`;
 }
 

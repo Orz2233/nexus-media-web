@@ -52,6 +52,7 @@ import {
   getContentProfileLabel,
   getContentProfileSearchSources,
 } from '#/plugin-framework';
+import { getImgUrl } from '#/utils/image';
 import { useAppNotification } from '#/utils/notify';
 import { useResourceHelpers } from '#/views/site/resources/composables/useResourceHelpers';
 
@@ -423,12 +424,6 @@ async function confirmUnsubscribe() {
   }
 }
 
-/** 图片 URL 处理：后端已统一转换代理路径，直接使用 */
-function getImgUrl(src?: string) {
-  if (!src) return '/static/img/no-image.png';
-  return src;
-}
-
 const loading = ref(false);
 const keyword = ref('');
 const searchtype = ref<'' | 'douban' | 'tmdb'>('tmdb');
@@ -465,6 +460,8 @@ interface MediaItem {
   content_profile?: string;
   metadata_ref?: string;
   provider?: string;
+  anchor_provider?: string;
+  anchor_external_id?: string;
   studio?: string;
   vote?: number | string;
   image?: string;
@@ -472,8 +469,6 @@ interface MediaItem {
   overview?: string;
   tmdb_id?: number | string;
   douban_id?: string;
-  anchor_provider?: string;
-  anchor_external_id?: string;
   link?: string;
   links?: Array<{ label: string; url: string }>;
   fav?: string;
@@ -647,6 +642,8 @@ function mapMetadataResults(list: any[]): MediaItem[] {
       overview: item.overview || '',
       poster: (isKeywordHit ? routePoster : '') || item.poster || '',
       provider: item.ref?.provider || '',
+      anchor_provider: item.ref?.provider || '',
+      anchor_external_id: item.ref?.external_id || '',
       studio: String(item.extra?.['adult.studio'] || ''),
       title: item.title || String(contentId || ''),
       tmdb_id: '',
@@ -694,9 +691,14 @@ async function handleSearch() {
 
 /** 点击媒体卡片 → 进入媒体详情 */
 function handleMediaCardClick(media: MediaItem) {
-  const anchorProvider = String((media as any).anchor_provider || '');
+  const anchorProvider = String(
+    (media as any).anchor_provider || media.provider || '',
+  );
   const anchorExternal = String(
-    (media as any).anchor_external_id || (media as any).douban_id || '',
+    (media as any).anchor_external_id ||
+      (media as any).douban_id ||
+      String(media.metadata_ref || '').split(':')[1] ||
+      '',
   );
   if (
     (anchorProvider === 'douban' || anchorProvider === 'bangumi') &&
@@ -1743,7 +1745,15 @@ async function confirmDownload() {
                 class="result-poster"
                 @click="openResultDetail(item)"
               >
-                <img :src="item.poster" alt="" />
+                <img
+                  :src="getImgUrl(item.poster)"
+                  alt=""
+                  @error="
+                    (e: any) => {
+                      e.target.src = '/static/img/no-image.png';
+                    }
+                  "
+                />
                 <div
                   v-if="item.type_key || item.content_profile"
                   class="result-poster-tag"
