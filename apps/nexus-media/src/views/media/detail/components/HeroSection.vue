@@ -89,7 +89,8 @@ function replaceLocalhost(url?: any) {
 function imageUrl(url?: any) {
   if (!url) return '';
   const s = String(url);
-  if (s.startsWith('/img/') || s.startsWith('/img?')) return s;
+  if (s.startsWith('/img?')) return getImgUrl(s);
+  if (s.startsWith('/img/')) return s;
   if (/^https?:\/\//.test(s)) return getImgUrl(s);
   return replaceLocalhost(s);
 }
