@@ -269,8 +269,11 @@ function handleSearchFromCard(item: Record<string, any>) {
   router.push({
     path: '/media/search',
     query: {
-      s: item.title,
-      from: item.contentProfile ? 'profile-search' : 'discovery',
+      s:
+        item.contentProfile && item.anchorExternalId
+          ? item.anchorExternalId
+          : item.title,
+      from: item.contentProfile ? 'subscription' : 'discovery',
       tmdbid: item.tmdbId || '',
       media_type: item.mediaType || item.type || '',
       anchor_provider: item.anchorProvider || '',
