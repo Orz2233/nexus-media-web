@@ -183,6 +183,19 @@ export function getContentProfileSearchSources(
   return contentProfiles[key]?.searchSources || [];
 }
 
+export function getContentProfileSourceOptions(): Array<{
+  label: string;
+  value: string;
+  profile: string;
+}> {
+  return Object.entries(contentProfiles).flatMap(([key, profile]) =>
+    (profile.searchSources || []).map((source) => ({
+      ...source,
+      profile: key,
+    })),
+  );
+}
+
 export function getContentProfileDefaultSearchSource(
   key?: null | string,
 ): string {

@@ -51,6 +51,7 @@ import {
   getContentProfileDetailPath,
   getContentProfileLabel,
   getContentProfileSearchSources,
+  getContentProfileSourceOptions,
 } from '#/plugin-framework';
 import { getImgUrl } from '#/utils/image';
 import { useAppNotification } from '#/utils/notify';
@@ -426,7 +427,7 @@ async function confirmUnsubscribe() {
 
 const loading = ref(false);
 const keyword = ref('');
-const searchtype = ref<'' | 'douban' | 'tmdb'>('tmdb');
+const searchtype = ref<string>('tmdb');
 const contentProfileKey = computed(() =>
   String(route.query.content_profile || ''),
 );
@@ -595,11 +596,21 @@ function resumeOngoingSearch(): boolean {
   return true;
 }
 
-const typeOptions = [
+const baseTypeOptions = [
   { label: '全部来源', value: '' },
   { label: 'TMDB', value: 'tmdb' },
   { label: '豆瓣', value: 'douban' },
 ];
+const pluginSourceOptions = computed(() => getContentProfileSourceOptions());
+const sourceProfileMap = computed(() =>
+  Object.fromEntries(
+    pluginSourceOptions.value.map((item) => [item.value, item.profile]),
+  ),
+);
+const typeOptions = computed(() => [
+  ...baseTypeOptions,
+  ...pluginSourceOptions.value,
+]);
 
 function metadataContentId(item: any): string {
   const extra = item?.extra || {};
@@ -655,17 +666,24 @@ function mapMetadataResults(list: any[]): MediaItem[] {
 }
 
 /** 普通搜索：搜索媒体词条 */
+function handleSourceTypeChange(value: string) {
+  searchtype.value = value;
+  if (keyword.value.trim()) handleSearch();
+}
+
 async function handleSearch() {
   if (!keyword.value.trim()) return;
   displayMode.value = 'media';
   mediaResults.value = [];
   loading.value = true;
   try {
-    if (contentProfileKey.value) {
+    const sourceProfile =
+      contentProfileKey.value || sourceProfileMap.value[searchtype.value] || '';
+    if (sourceProfile) {
       const res: any = await searchMetadataApi({
-        content_profile: contentProfileKey.value,
+        content_profile: sourceProfile,
         limit: 24,
-        provider: metadataSource.value || undefined,
+        provider: metadataSource.value || searchtype.value || undefined,
         query: keyword.value,
       });
       const list = Array.isArray(res) ? res : res?.data || [];
@@ -676,7 +694,7 @@ async function handleSearch() {
     }
     const res: any = await searchMediaApi({
       keyword: keyword.value,
-      searchtype: searchtype.value,
+      searchtype: searchtype.value as '' | 'douban' | 'tmdb',
     });
     // requestClient 在 code===0 时自动解包返回 data，所以 res 直接是数组
     mediaResults.value = Array.isArray(res) ? res : res?.data || [];
@@ -1522,6 +1540,7 @@ async function confirmDownload() {
           v-model:value="searchtype"
           :options="typeOptions"
           class="search-select"
+          @update:value="handleSourceTypeChange"
         />
         <NSelect
           v-model:value="selectedSites"
