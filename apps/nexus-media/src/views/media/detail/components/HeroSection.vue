@@ -15,6 +15,7 @@ interface Props {
   subSeasons?: number[];
   showSubscribe?: boolean;
   typeLabel?: string;
+  posterPosition?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -23,6 +24,7 @@ const props = withDefaults(defineProps<Props>(), {
   subSeasons: () => [],
   showSubscribe: true,
   typeLabel: '',
+  posterPosition: '',
 });
 
 const emit = defineEmits<{
@@ -133,7 +135,10 @@ function imageUrl(url?: any) {
             :src="posterSrc"
             :alt="detail.title || 'poster'"
             class="h-full w-full object-cover transition-opacity duration-300"
-            :style="{ opacity: posterStatus === 'loaded' ? 1 : 0 }"
+            :style="{
+              opacity: posterStatus === 'loaded' ? 1 : 0,
+              objectPosition: posterPosition || '50% 50%',
+            }"
             decoding="async"
             fetchpriority="high"
             @load="posterStatus = 'loaded'"
