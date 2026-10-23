@@ -18,7 +18,10 @@ import {
 } from '#/api/modules/subscription';
 import SubscribeConfirmModal from '#/components/subscribe/SubscribeConfirmModal.vue';
 import SubscribeEditModal from '#/components/subscribe/SubscribeEditModal.vue';
-import { getContentProfileLabel } from '#/plugin-framework';
+import {
+  getContentProfileLabel,
+  getContentProfilePosterPosition,
+} from '#/plugin-framework';
 import { getImgUrl } from '#/utils/image';
 import { useAppNotification } from '#/utils/notify';
 
@@ -77,6 +80,9 @@ const typeLabel = computed(() => {
 });
 
 const posterUrl = computed(() => getImgUrl(props.poster));
+const posterPosition = computed(
+  () => getContentProfilePosterPosition(props.contentProfile) || '50% 50%',
+);
 const subscribed = computed(() => _fav.value === '1');
 const inLibrary = computed(() => _fav.value === '2');
 const isTvType = computed(() => {
@@ -318,6 +324,7 @@ function onImgError(e: Event) {
       <img
         :src="posterUrl"
         class="w-full h-full object-cover"
+        :style="{ objectPosition: posterPosition }"
         alt=""
         @error="onImgError"
       />

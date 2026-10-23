@@ -148,6 +148,7 @@ const contentProfiles = reactive<
       label: string;
       presentationType: string;
       searchSources: Array<{ label: string; value: string }>;
+      posterPosition?: string;
     }
   >
 >({});
@@ -196,6 +197,11 @@ export function getContentProfileSourceOptions(): Array<{
   );
 }
 
+export function getContentProfilePosterPosition(key?: null | string): string {
+  if (!key) return '';
+  return contentProfiles[key]?.posterPosition || '';
+}
+
 export function getContentProfileDefaultSearchSource(
   key?: null | string,
 ): string {
@@ -225,6 +231,7 @@ function registerContentProfiles(plugin: PluginManifestFrontend) {
       label: profile.label || profile.key,
       presentationType:
         profile.presentation_type || profile.media_type || 'movie',
+      posterPosition: profile.poster_position || '',
       searchSources: Array.isArray(profile.search_sources)
         ? profile.search_sources.filter((item) => item?.label && item?.value)
         : [],
@@ -242,6 +249,7 @@ export interface PluginManifestFrontend {
       key: string;
       label: string;
       presentation_type?: string;
+      poster_position?: string;
       /** @deprecated 旧 manifest 字段，读取时兼容 */
       media_type?: string;
       detail_path?: string;
