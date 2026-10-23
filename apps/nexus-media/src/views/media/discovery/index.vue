@@ -556,11 +556,17 @@ onUnmounted(() => {
       </NSpin>
 
       <div
-        v-if="hasMore"
+        v-if="hasMore || loadingMore"
         ref="sentinelRef"
         class="flex flex-col items-center justify-center gap-2 mt-6 min-h-12"
       >
-        <NSpin v-if="loadingMore" size="small" />
+        <template v-if="loadingMore">
+          <IconifyIcon
+            icon="lucide:loader-circle"
+            class="size-6 animate-spin text-primary"
+          />
+          <span class="text-xs text-muted-foreground">加载中...</span>
+        </template>
         <span v-else class="text-xs text-muted-foreground">
           已加载 {{ items.length }} 条，继续滚动加载
         </span>

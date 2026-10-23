@@ -32,7 +32,7 @@ export function getImgUrl(src?: null | string): string {
   if (src.includes('doubanio.com') || src.includes('douban.com'))
     return `/img/douban/${encodeURIComponent(src)}`;
   if (src.includes('lain.bgm.tv')) return `/img/bgm/${encodeURIComponent(src)}`;
-  return `/img?url=${encodeURIComponent(src)}`;
+  return `/img/library/${encodeURIComponent(src)}`;
 }
 
 /**
