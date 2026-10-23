@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { DiscoveryApi } from '#/api/modules/media';
 
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { IconifyIcon } from '@vben/icons';
@@ -32,6 +32,8 @@ const loadingMore = ref(false);
 const loadingSources = ref(true);
 const selectedSeason = ref(currentSeason());
 const selectedYear = ref('');
+const sentinelRef = ref<HTMLElement | null>(null);
+let loadMoreObserver: IntersectionObserver | null = null;
 const PREF_KEY = 'nexus.discovery.preference';
 
 const pageTitleMap: Record<string, string> = {
@@ -312,9 +314,21 @@ function selectYear(value: string) {
 }
 
 function loadMore() {
-  if (!hasMore.value || loadingMore.value) return;
+  if (!hasMore.value || loading.value || loadingMore.value) return;
   page.value += 1;
   loadItems(false);
+}
+
+function setupLoadMoreObserver() {
+  if (!('IntersectionObserver' in window)) return;
+  loadMoreObserver?.disconnect();
+  loadMoreObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) loadMore();
+    },
+    { rootMargin: '240px 0px' },
+  );
+  if (sentinelRef.value) loadMoreObserver.observe(sentinelRef.value);
 }
 
 watch(selectedYear, (value) => {
@@ -342,9 +356,28 @@ watch(
   },
 );
 
+watch(
+  [hasMore, loading, loadingMore],
+  async () => {
+    await nextTick();
+    if (hasMore.value && sentinelRef.value) {
+      if (!loadMoreObserver) setupLoadMoreObserver();
+      else loadMoreObserver.observe(sentinelRef.value);
+    }
+  },
+  { immediate: true },
+);
+
 onMounted(async () => {
   await loadSources();
   await loadItems(true);
+  await nextTick();
+  setupLoadMoreObserver();
+});
+
+onUnmounted(() => {
+  loadMoreObserver?.disconnect();
+  loadMoreObserver = null;
 });
 </script>
 
@@ -494,8 +527,15 @@ onMounted(async () => {
         />
       </NSpin>
 
-      <div v-if="hasMore" class="flex justify-center mt-6">
-        <NButton :loading="loadingMore" @click="loadMore">加载更多</NButton>
+      <div
+        v-if="hasMore"
+        ref="sentinelRef"
+        class="flex flex-col items-center justify-center gap-2 mt-6 min-h-12"
+      >
+        <NSpin v-if="loadingMore" size="small" />
+        <span v-else class="text-xs text-muted-foreground">
+          已加载 {{ items.length }} 条，继续滚动加载
+        </span>
       </div>
       <div
         v-else-if="items.length > 0"
