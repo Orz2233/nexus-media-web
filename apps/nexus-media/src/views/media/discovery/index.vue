@@ -198,7 +198,14 @@ async function loadItems(reset = false) {
       }),
     );
     const list = result?.items || [];
-    items.value = reset ? list : [...items.value, ...list];
+    const merged = reset ? list : [...items.value, ...list];
+    const seen = new Set<string>();
+    items.value = merged.filter((item) => {
+      const key = `${item.provider}:${item.ref?.external_id || item.title}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     hasMore.value = Boolean(result?.has_more);
   } finally {
     loading.value = false;
