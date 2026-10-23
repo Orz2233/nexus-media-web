@@ -31,6 +31,7 @@ import { formatPix, formatRestype } from '#/utils/subscribe';
 interface Props {
   item: Record<string, any>;
   type: 'anime' | 'movie' | 'tv';
+  typeLabel?: string;
   filterRuleMap?: Record<string, string>;
   downloadSettingMap?: Record<string, string>;
 }
@@ -38,6 +39,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   filterRuleMap: () => ({}),
   downloadSettingMap: () => ({}),
+  typeLabel: '',
 });
 
 const emit = defineEmits<{
@@ -72,9 +74,14 @@ const stateLabel = computed(
   () => stateLabelMap[props.item.state || ''] || props.item.state || '未知',
 );
 
-const typeLabel = computed(() =>
-  props.type === 'movie' ? '电影' : props.type === 'anime' ? '动漫' : '剧集',
-);
+const typeLabel = computed(() => {
+  if (props.typeLabel) return props.typeLabel;
+  return props.type === 'movie'
+    ? '电影'
+    : props.type === 'anime'
+      ? '动漫'
+      : '剧集';
+});
 
 const voteText = computed(() => {
   const v = props.item.vote;

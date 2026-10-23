@@ -18,6 +18,8 @@ import {
 } from '#/api/modules/subscription';
 import SubscribeConfirmModal from '#/components/subscribe/SubscribeConfirmModal.vue';
 import SubscribeEditModal from '#/components/subscribe/SubscribeEditModal.vue';
+import { getContentProfileLabel } from '#/plugin-framework';
+import { getImgUrl } from '#/utils/image';
 import { useAppNotification } from '#/utils/notify';
 
 interface Props {
@@ -35,6 +37,11 @@ interface Props {
   genres?: string[];
   countries?: string[];
   languages?: string[];
+  anchorProvider?: string;
+  anchorExternalId?: string;
+  contentProfile?: string;
+  metadataRef?: string;
+  detailLink?: string;
 }
 
 const props = defineProps<Props>();
@@ -55,6 +62,13 @@ const _fav = ref(props.fav || '0');
 const _rssid = ref(props.rssid || '');
 
 const typeLabel = computed(() => {
+  // 自定义画像优先使用插件标签；插件前端未就绪时也不回落成“电影”
+  if (props.contentProfile && props.contentProfile !== 'default') {
+    return (
+      getContentProfileLabel(props.contentProfile) ||
+      props.contentProfile.toUpperCase()
+    );
+  }
   const t = props.mediaType || props.type || '';
   if (t === 'movie' || t === '电影') return '电影';
   if (t === 'anime' || t === '动漫') return '动漫';
@@ -62,6 +76,7 @@ const typeLabel = computed(() => {
   return '';
 });
 
+const posterUrl = computed(() => getImgUrl(props.poster));
 const subscribed = computed(() => _fav.value === '1');
 const inLibrary = computed(() => _fav.value === '2');
 const isTvType = computed(() => {
@@ -70,6 +85,14 @@ const isTvType = computed(() => {
 });
 
 const mediaId = computed(() => String(props.tmdbId || props.id));
+const subscribeMediaId = computed(() => {
+  const provider = props.anchorProvider;
+  const externalId = props.anchorExternalId || String(props.id);
+  if (!provider) return String(props.tmdbId || props.id);
+  if (provider === 'douban') return `DB:${externalId}`;
+  if (provider === 'bangumi') return `BG:${externalId}`;
+  return `${provider}:${externalId}`;
+});
 
 const metaTags = computed(() => {
   const tags = [
@@ -81,6 +104,10 @@ const metaTags = computed(() => {
 });
 
 function goDetail() {
+  if (props.detailLink) {
+    router.push(props.detailLink);
+    return;
+  }
   const t = props.mediaType || props.type || 'movie';
   const typeParam =
     t === '电影' ? 'movie' : t === '剧集' ? 'tv' : t.toLowerCase();
@@ -104,12 +131,17 @@ function handleSubscribe(e: Event) {
   }
   subscribeItem.value = {
     id: mediaId.value,
+    mediaid: subscribeMediaId.value,
+    anchor_provider: props.anchorProvider,
+    anchor_external_id: props.anchorExternalId,
     tmdbid: mediaId.value,
     title: props.title,
     year: props.year || '',
     type: isTvType.value ? 'tv' : 'movie',
-    image: props.poster,
+    image: posterUrl.value,
     overview: props.overview,
+    content_profile: props.contentProfile,
+    metadata_ref: props.metadataRef,
   };
   subscribeShow.value = true;
 }
@@ -131,6 +163,7 @@ async function confirmUnsubscribe() {
 async function handleConfirmSubscribe(payload: {
   add: number[];
   autoMode: boolean;
+  policy?: string;
   remove: number[];
   selected: number[];
 }) {
@@ -145,8 +178,12 @@ async function handleConfirmSubscribe(payload: {
           name: it.title,
           year: it.year || '',
           type: 'tv',
-          mediaid: String(it.id),
+          mediaid: it.mediaid || String(it.id),
           season: String(season),
+          metadata_policy:
+            payload.policy === 'auto' ? undefined : payload.policy,
+          metadata_ref: it.metadata_ref,
+          content_profile: it.content_profile,
         });
       }
       for (const season of remove) {
@@ -171,7 +208,10 @@ async function handleConfirmSubscribe(payload: {
         name: it.title,
         year: it.year || '',
         type: typeParam,
-        mediaid: String(it.id),
+        mediaid: it.mediaid || String(it.id),
+        metadata_ref: it.metadata_ref,
+        content_profile: it.content_profile,
+        metadata_policy: payload.policy === 'auto' ? undefined : payload.policy,
       });
       _fav.value = '1';
       if (res?.rssid) _rssid.value = String(res.rssid);
@@ -260,7 +300,7 @@ function onImgError(e: Event) {
   >
     <div class="aspect-[2/3]" style="background: hsl(var(--muted))">
       <img
-        :src="poster || '/static/img/no-image.png'"
+        :src="posterUrl"
         class="w-full h-full object-cover"
         alt=""
         @error="onImgError"

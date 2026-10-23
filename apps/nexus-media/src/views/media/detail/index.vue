@@ -9,6 +9,7 @@ import { NButton, NSpin, useMessage } from 'naive-ui';
 
 import {
   getMediaDetailApi,
+  getMediaDetailByRefApi,
   getRecommendationsApi,
   getSimilarApi,
   webSearchApi,
@@ -41,7 +42,21 @@ const similar = ref<any[]>([]);
 const recommends = ref<any[]>([]);
 const fav = ref<string>('0');
 
-const mediaId = computed(() => String(route.query.id || ''));
+const detailProvider = computed(() => String(route.query.provider || ''));
+const detailExternalId = computed(() =>
+  String(route.query.ref || route.query.external_id || ''),
+);
+const isExternalDetail = computed(
+  () => !!detailProvider.value && detailProvider.value !== 'tmdb',
+);
+const mediaId = computed(() =>
+  String(
+    isExternalDetail.value ? detailExternalId.value : route.query.id || '',
+  ),
+);
+const subscribeMediaId = computed(() =>
+  String(detail.value.mediaid || mediaId.value),
+);
 const mediaType = computed(() => {
   const t = String(route.query.type || 'movie');
   if (t.toLowerCase() === 'movie') return 'movie';
@@ -59,7 +74,13 @@ async function loadDetail() {
   }
   loading.value = true;
   try {
-    const res: any = await getMediaDetailApi(mediaId.value, tmdbType.value);
+    const res: any = isExternalDetail.value
+      ? await getMediaDetailByRefApi(
+          detailProvider.value,
+          detailExternalId.value,
+          mediaType.value,
+        )
+      : await getMediaDetailApi(mediaId.value, tmdbType.value);
     if (res && typeof res === 'object' && res.title) {
       detail.value = res;
       fav.value = String(res.fav || '0');
@@ -67,8 +88,16 @@ async function loadDetail() {
       subSeasons.value = Array.isArray(res.sub_seasons)
         ? res.sub_seasons.map(Number)
         : [];
+      if (
+        isExternalDetail.value &&
+        Array.isArray(detail.value.similar) &&
+        detail.value.similar.length > 0
+      ) {
+        similar.value = detail.value.similar;
+      }
       if (detail.value.tmdbid) {
-        loadSimilar();
+        if (!isExternalDetail.value || similar.value.length === 0)
+          loadSimilar();
         loadRecommends();
       }
     } else {
@@ -83,6 +112,14 @@ async function loadDetail() {
 }
 
 async function loadSimilar() {
+  if (
+    isExternalDetail.value &&
+    Array.isArray(detail.value.similar) &&
+    detail.value.similar.length > 0
+  ) {
+    similar.value = detail.value.similar;
+    return;
+  }
   const tid = detail.value.tmdbid;
   if (!tid) return;
   try {
@@ -149,8 +186,8 @@ async function handleSubscribe() {
   // 电视剧：始终打开季选择框（未订阅=订阅，已订阅=追加其他季）
   if (isTv.value) {
     subscribeConfirmItem.value = {
-      id: mediaId.value,
-      tmdbid: mediaId.value,
+      id: subscribeMediaId.value,
+      tmdbid: subscribeMediaId.value,
       title: detail.value.title,
       year: detail.value.year || '',
       type: 'tv',
@@ -176,7 +213,7 @@ async function handleSubscribe() {
         name: detail.value.title,
         year: detail.value.year || '',
         type: mediaType.value,
-        mediaid: mediaId.value,
+        mediaid: subscribeMediaId.value,
       });
       fav.value = '1';
       message.success('已添加订阅');
@@ -200,7 +237,7 @@ async function handleConfirmSubscribe(payload: {
         name: detail.value.title,
         year: detail.value.year || '',
         type: 'tv',
-        mediaid: mediaId.value,
+        mediaid: subscribeMediaId.value,
         season: String(season),
       });
     }
@@ -209,7 +246,7 @@ async function handleConfirmSubscribe(payload: {
         name: detail.value.title,
         year: detail.value.year || '',
         type: 'tv',
-        tmdbid: mediaId.value,
+        tmdbid: subscribeMediaId.value,
         season: String(season),
       });
     }
@@ -306,11 +343,19 @@ onMounted(() => {
   loadDetail();
 });
 
-watch([() => route.query.id, () => route.query.type], () => {
-  loadDetail();
-  loadSimilar();
-  loadRecommends();
-});
+watch(
+  [
+    () => route.query.id,
+    () => route.query.type,
+    () => route.query.provider,
+    () => route.query.ref,
+  ],
+  () => {
+    loadDetail();
+    loadSimilar();
+    loadRecommends();
+  },
+);
 </script>
 
 <template>

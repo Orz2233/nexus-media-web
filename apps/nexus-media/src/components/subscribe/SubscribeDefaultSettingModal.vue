@@ -28,6 +28,8 @@ import {
 interface Props {
   mtype: 'movie' | 'tv';
   show: boolean;
+  contentProfile?: string;
+  titleOverride?: string;
 }
 
 const props = defineProps<Props>();
@@ -57,9 +59,10 @@ const form = ref({
   search_sites: [] as string[],
 });
 
-const title = computed(() =>
-  props.mtype === 'movie' ? '电影订阅默认设置' : '电视剧订阅默认设置',
-);
+const title = computed(() => {
+  if (props.titleOverride) return props.titleOverride;
+  return props.mtype === 'movie' ? '电影订阅默认设置' : '电视剧订阅默认设置';
+});
 
 watch(
   () => props.show,
@@ -116,7 +119,10 @@ function nullableString(val: any): string {
 
 async function loadSettings() {
   try {
-    const res: any = await getDefaultSubscriptionSettingApi(props.mtype);
+    const res: any = await getDefaultSubscriptionSettingApi(
+      props.mtype,
+      props.contentProfile,
+    );
     const data = res?.data || res || {};
     form.value = {
       over_edition:
@@ -191,6 +197,7 @@ function handleConfirm() {
     download_setting: form.value.download_setting,
     rss_sites: form.value.rss_sites,
     search_sites: form.value.search_sites,
+    ...(props.contentProfile ? { content_profile: props.contentProfile } : {}),
   });
   emit('update:show', false);
 }

@@ -120,17 +120,25 @@ export async function deleteSubscriptionApi(id: number) {
 }
 
 /** 获取默认订阅设置 */
-export async function getDefaultSubscriptionSettingApi(mtype: string) {
-  return requestClient.post('/subscription/default_setting', { mtype });
+export async function getDefaultSubscriptionSettingApi(
+  mtype: string,
+  contentProfile?: string,
+) {
+  return requestClient.post('/subscription/default_setting', {
+    mtype,
+    ...(contentProfile ? { content_profile: contentProfile } : {}),
+  });
 }
 
 /** 保存默认订阅设置 */
 export async function saveDefaultSubscriptionSettingApi(
   mtype: string,
   data: Record<string, any>,
+  contentProfile?: string,
 ) {
   return requestClient.post('/subscription/default_setting/save', {
     mtype,
+    ...(contentProfile ? { content_profile: contentProfile } : {}),
     ...data,
   });
 }
@@ -179,11 +187,15 @@ export async function redoSubscriptionHistoryApi(
 /** 添加订阅（从发现页触发） */
 export async function addSubscriptionMediaApi(data: {
   mediaid?: string;
+  metadata_ref?: string;
   name: string;
   page?: string;
   season?: string;
   type: string;
   year?: string;
+  metadata_policy?: string;
+  content_profile?: string;
+  naming_profile?: string;
 }) {
   return requestClient.post('/subscription/add', data);
 }

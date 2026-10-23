@@ -11,12 +11,16 @@ interface Props {
   searching?: boolean;
   seasons?: any[];
   subSeasons?: number[];
+  showSubscribe?: boolean;
+  typeLabel?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   searching: false,
   seasons: () => [],
   subSeasons: () => [],
+  showSubscribe: true,
+  typeLabel: '',
 });
 
 const emit = defineEmits<{
@@ -31,6 +35,22 @@ const tmdbUrl = computed(() => {
   if (!tid) return '';
   const base = isTv.value ? 'tv' : 'movie';
   return `https://www.themoviedb.org/${base}/${tid}`;
+});
+
+const detailUrl = computed(() => props.detail.link || tmdbUrl.value);
+
+const genresText = computed(() =>
+  Array.isArray(props.detail.genres)
+    ? props.detail.genres.join(' / ')
+    : props.detail.genres || '',
+);
+
+const sourceLinks = computed<Array<{ label: string; url: string }>>(() => {
+  if (Array.isArray(props.detail.links) && props.detail.links.length > 0) {
+    return props.detail.links;
+  }
+  if (!tmdbUrl.value) return [];
+  return [{ label: 'TMDB', url: tmdbUrl.value }];
 });
 
 const subscribedLabel = computed(() => {
@@ -50,6 +70,14 @@ function replaceLocalhost(url?: any) {
     window.location.origin,
   );
 }
+
+function imageUrl(url?: any) {
+  if (!url) return '';
+  const s = String(url);
+  if (s.startsWith('/img/') || s.startsWith('/img?')) return s;
+  if (/^https?:\/\//.test(s)) return `/img?url=${encodeURIComponent(s)}`;
+  return replaceLocalhost(s);
+}
 </script>
 
 <template>
@@ -62,7 +90,7 @@ function replaceLocalhost(url?: any) {
       v-if="detail.background || detail.backdrop"
       class="absolute inset-0 bg-cover bg-center opacity-20"
       :style="{
-        backgroundImage: `url(${replaceLocalhost(detail.background || detail.backdrop)})`,
+        backgroundImage: `url(${imageUrl(detail.background || detail.backdrop)})`,
       }"
     ></div>
     <div
@@ -82,7 +110,7 @@ function replaceLocalhost(url?: any) {
       <div class="shrink-0">
         <img
           v-if="detail.image || detail.poster"
-          :src="replaceLocalhost(detail.image || detail.poster)"
+          :src="imageUrl(detail.image || detail.poster)"
           class="mx-auto h-64 w-44 rounded-xl object-cover shadow-xl md:mx-0 md:h-80 md:w-52"
           alt="poster"
         />
@@ -115,11 +143,12 @@ function replaceLocalhost(url?: any) {
             "
           >
             {{
-              detail.type === 'movie'
+              typeLabel ||
+              (detail.type === 'movie'
                 ? '电影'
                 : detail.type === 'anime'
                   ? '动漫'
-                  : '电视剧'
+                  : '电视剧')
             }}
           </NTag>
         </div>
@@ -129,8 +158,8 @@ function replaceLocalhost(url?: any) {
           style="color: hsl(var(--card-foreground))"
         >
           <a
-            v-if="tmdbUrl"
-            :href="tmdbUrl"
+            v-if="detailUrl"
+            :href="detailUrl"
             target="_blank"
             rel="noopener"
             class="hover:underline"
@@ -151,7 +180,7 @@ function replaceLocalhost(url?: any) {
         >
           <span v-if="detail.runtime">{{ detail.runtime }}</span>
           <span v-if="detail.runtime && detail.genres">•</span>
-          <span v-if="detail.genres">{{ detail.genres }}</span>
+          <span v-if="genresText">{{ genresText }}</span>
           <span v-if="seasons.length > 0">• 共 {{ seasons.length }} 季</span>
         </div>
 
@@ -169,6 +198,7 @@ function replaceLocalhost(url?: any) {
           </NButton>
 
           <NButton
+            v-if="showSubscribe"
             size="medium"
             :type="fav === '1' ? 'error' : 'default'"
             @click="emit('subscribe')"
@@ -182,6 +212,17 @@ function replaceLocalhost(url?: any) {
             {{
               fav === '1' && isTv ? '管理订阅' : fav === '1' ? '已订阅' : '订阅'
             }}
+          </NButton>
+
+          <NButton
+            v-for="source in sourceLinks"
+            :key="source.url"
+            size="medium"
+            tag="a"
+            :href="source.url"
+            target="_blank"
+          >
+            {{ source.label }}详情
           </NButton>
 
           <NButton

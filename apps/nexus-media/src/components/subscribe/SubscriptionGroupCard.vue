@@ -34,6 +34,7 @@ interface Props {
   vote?: number | string;
   items: Record<string, any>[];
   type: 'anime' | 'movie' | 'tv';
+  typeLabel?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -41,6 +42,7 @@ const props = withDefaults(defineProps<Props>(), {
   season: '',
   image: '',
   vote: '',
+  typeLabel: '',
 });
 
 const emit = defineEmits<{
@@ -87,6 +89,15 @@ const captionTitle = computed(() => {
 });
 
 const subscriberCount = computed(() => props.items.length);
+
+const typeText = computed(() => {
+  if (props.typeLabel) return props.typeLabel;
+  return props.type === 'movie'
+    ? '电影'
+    : props.type === 'anime'
+      ? '动漫'
+      : '剧集';
+});
 
 function usernameOf(item: Record<string, any>): string {
   return item.username || (item.user_id ? `用户#${item.user_id}` : '系统');
@@ -260,9 +271,7 @@ onMounted(ensureOutsideListener);
         <div class="sgc-meta">
           <span v-if="year">{{ year }}</span>
           <span class="sgc-dot-sep">·</span>
-          <span>{{
-            type === 'movie' ? '电影' : type === 'anime' ? '动漫' : '剧集'
-          }}</span>
+          <span>{{ typeText }}</span>
           <template v-if="seasonLabel">
             <span class="sgc-dot-sep">·</span>
             <span>{{ seasonLabel }}</span>

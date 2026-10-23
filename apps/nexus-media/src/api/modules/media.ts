@@ -53,11 +53,36 @@ export async function searchMediaApi(params: MediaApi.SearchParams) {
   );
 }
 
+/** 按内容画像搜索元数据（插件 provider） */
+export async function searchMetadataApi(params: {
+  content_profile: string;
+  limit?: number;
+  provider?: string;
+  query: string;
+}) {
+  return requestClient.post<Record<string, any>[]>(
+    '/media/metadata/search',
+    params,
+  );
+}
+
 /** 获取媒体详情 */
 export async function getMediaDetailApi(tmdbid: number | string, type: string) {
   return requestClient.post<MediaApi.MediaDetail>('/media/detail', {
     tmdbid,
     type,
+  });
+}
+
+export async function getMediaDetailByRefApi(
+  provider: string,
+  externalId: string,
+  mediaType?: string,
+) {
+  return requestClient.post<Record<string, any>>('/media/detail_by_ref', {
+    provider,
+    external_id: externalId,
+    media_type: mediaType,
   });
 }
 
@@ -683,4 +708,70 @@ export async function previewNameFormatApi(data: {
     segments: Record<string, string>;
     validate: NameFormatValidateResult;
   }>('/media/name_format/preview', data);
+}
+
+export namespace DiscoveryApi {
+  export interface Feed {
+    key: string;
+    title: string;
+    kind: string;
+    icon?: string;
+    facets: string[];
+    page_size: number;
+  }
+
+  export interface Source {
+    provider: string;
+    name: string;
+    visibility: 'private' | 'public';
+    feeds: Feed[];
+  }
+
+  export interface ItemRef {
+    provider: string;
+    external_id: string;
+    media_type?: string;
+    scope?: string;
+  }
+
+  export interface Item {
+    provider: string;
+    ref: ItemRef;
+    content_profile: string;
+    title: string;
+    original_title?: string;
+    year?: string;
+    poster?: string;
+    backdrop?: string;
+    rating: Record<string, number>;
+    tags: string[];
+    anchor_ref?: ItemRef;
+    actions: string[];
+    extra?: Record<string, any>;
+  }
+
+  export interface Page {
+    items: Item[];
+    page: number;
+    has_more: boolean;
+  }
+}
+
+/** 获取探索页来源与 feed */
+export async function getDiscoveryProvidersApi() {
+  return requestClient.get<DiscoveryApi.Source[]>('/media/discovery/providers');
+}
+
+/** 获取探索 feed 内容 */
+export async function getDiscoveryItemsApi(params: {
+  provider: string;
+  feed: string;
+  page?: number;
+  filters?: Record<string, any>;
+}) {
+  return requestClient.post<DiscoveryApi.Page>('/media/discovery/items', {
+    page: 1,
+    filters: {},
+    ...params,
+  });
 }

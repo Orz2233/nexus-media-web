@@ -13,7 +13,7 @@ const fallbackImage = '/static/img/no-image.png';
  */
 export function getImgUrl(src?: null | string): string {
   if (!src) return fallbackImage;
-  if (src.startsWith('/img/')) return src;
+  if (src.startsWith('/img/') || src.startsWith('/img?')) return src;
   const tmdbMatch = src.match(/https?:\/\/image\.tmdb\.org\/t\/p\/(\w+)(\/.+)/);
   if (tmdbMatch) return `/img/tmdb/${tmdbMatch[1]}${tmdbMatch[2]}`;
   return `/img?url=${encodeURIComponent(src)}`;
