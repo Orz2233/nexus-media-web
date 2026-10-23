@@ -34,6 +34,7 @@ const selectedSeason = ref(currentSeason());
 const selectedYear = ref('');
 const sentinelRef = ref<HTMLElement | null>(null);
 let loadMoreObserver: IntersectionObserver | null = null;
+let scrollCheckFrame = 0;
 const PREF_KEY = 'nexus.discovery.preference';
 
 const pageTitleMap: Record<string, string> = {
@@ -319,6 +320,30 @@ function loadMore() {
   loadItems(false);
 }
 
+function isNearPageBottom(target?: EventTarget | null) {
+  const viewportHeight = window.innerHeight;
+  const documentElement = document.documentElement;
+  if (documentElement.scrollHeight - window.scrollY - viewportHeight < 600) {
+    return true;
+  }
+  if (
+    target instanceof HTMLElement &&
+    target.scrollHeight > target.clientHeight + 100
+  ) {
+    return target.scrollHeight - target.scrollTop - target.clientHeight < 600;
+  }
+  return false;
+}
+
+function handleScrollForLoadMore(event: Event) {
+  if (!hasMore.value || loading.value || loadingMore.value) return;
+  if (scrollCheckFrame) return;
+  scrollCheckFrame = requestAnimationFrame(() => {
+    scrollCheckFrame = 0;
+    if (isNearPageBottom(event.target)) loadMore();
+  });
+}
+
 function setupLoadMoreObserver() {
   if (!('IntersectionObserver' in window)) return;
   loadMoreObserver?.disconnect();
@@ -373,11 +398,14 @@ onMounted(async () => {
   await loadItems(true);
   await nextTick();
   setupLoadMoreObserver();
+  window.addEventListener('scroll', handleScrollForLoadMore, true);
 });
 
 onUnmounted(() => {
   loadMoreObserver?.disconnect();
   loadMoreObserver = null;
+  window.removeEventListener('scroll', handleScrollForLoadMore, true);
+  if (scrollCheckFrame) cancelAnimationFrame(scrollCheckFrame);
 });
 </script>
 
