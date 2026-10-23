@@ -263,6 +263,17 @@ export async function getMessageClientDefaultTemplatesApi() {
   );
 }
 
+/** 获取插件内容画像消息模板 */
+export async function getMessageClientProfileTemplatesApi() {
+  return requestClient.get<{
+    profiles: Array<{
+      key: string;
+      label: string;
+      templates: Record<string, { text: string; title: string }>;
+    }>;
+  }>('/system/message_clients/templates/profiles');
+}
+
 /** 更新消息客户端 */
 export async function updateMessageClientApi(data: {
   cid?: number;

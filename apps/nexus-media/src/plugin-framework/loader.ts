@@ -44,9 +44,18 @@ import { IconifyIcon } from '@vben/icons';
 
 import * as NaiveUI from 'naive-ui';
 
+import { message, modal } from '#/adapter/naive';
 import { requestClient } from '#/api/request';
+import EmptyState from '#/components/empty/EmptyState.vue';
 import PathPickerModal from '#/components/media/PathPickerModal.vue';
+import PageHeader from '#/components/page/PageHeader.vue';
+import SubscribeDefaultSettingModal from '#/components/subscribe/SubscribeDefaultSettingModal.vue';
+import SubscribeEditModal from '#/components/subscribe/SubscribeEditModal.vue';
+import SubscriptionGroupCard from '#/components/subscribe/SubscriptionGroupCard.vue';
+import SubscriptionHoverCard from '#/components/subscribe/SubscriptionHoverCard.vue';
 import { router } from '#/router';
+import HeroSection from '#/views/media/detail/components/HeroSection.vue';
+import RenameFormatBuilder from '#/views/system/basic/components/RenameFormatBuilder.vue';
 
 const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);
 
@@ -84,7 +93,17 @@ const host = {
   },
   IconifyIcon,
   NaiveUI,
+  EmptyState,
+  HeroSection,
+  PageHeader,
+  RenameFormatBuilder,
   PathPickerModal,
+  SubscribeDefaultSettingModal,
+  SubscribeEditModal,
+  SubscriptionGroupCard,
+  SubscriptionHoverCard,
+  message,
+  modal,
   api: requestClient,
 };
 
@@ -108,17 +127,118 @@ const slotRegistry = reactive<
 /** 插件路由注册表 */
 const pluginRoutes = new Map<string, RouteRecordRaw[]>();
 
+/** 菜单路径 -> 插件组件，供通用宿主页动态渲染 */
+const pluginPathComponents = reactive<
+  Record<string, { componentName: string; pluginId: string }>
+>({});
+
+export function getPluginComponentByPath(path: string): Component | null {
+  const entry = pluginPathComponents[path];
+  if (!entry) return null;
+  return getPluginComponent(entry.pluginId, entry.componentName);
+}
+
+/** 插件声明的自定义内容画像（key -> 展示名/媒体类型） */
+const contentProfiles = reactive<
+  Record<
+    string,
+    {
+      defaultSearchSource: string;
+      detailPath: string;
+      label: string;
+      presentationType: string;
+      searchSources: Array<{ label: string; value: string }>;
+    }
+  >
+>({});
+
+export function getContentProfileLabel(key?: null | string): string {
+  if (!key) return '';
+  return contentProfiles[key]?.label || '';
+}
+
+export function getContentProfilePresentationType(key?: null | string): string {
+  if (!key) return '';
+  return contentProfiles[key]?.presentationType || '';
+}
+
+/** @deprecated 使用 getContentProfilePresentationType */
+export function getContentProfileMediaType(key?: null | string): string {
+  return getContentProfilePresentationType(key);
+}
+
+export function getContentProfileDetailPath(key?: null | string): string {
+  if (!key) return '';
+  return contentProfiles[key]?.detailPath || '';
+}
+
+export function getContentProfileSearchSources(
+  key?: null | string,
+): Array<{ label: string; value: string }> {
+  if (!key) return [];
+  return contentProfiles[key]?.searchSources || [];
+}
+
+export function getContentProfileDefaultSearchSource(
+  key?: null | string,
+): string {
+  if (!key) return '';
+  return contentProfiles[key]?.defaultSearchSource || '';
+}
+
+export function getContentProfileOptions(): Array<{
+  label: string;
+  value: string;
+}> {
+  return Object.entries(contentProfiles).map(([key, profile]) => ({
+    label: profile.label,
+    value: key,
+  }));
+}
+
+function registerContentProfiles(plugin: PluginManifestFrontend) {
+  for (const profile of plugin.frontend.content_profiles || []) {
+    if (!profile.key) continue;
+    contentProfiles[profile.key] = {
+      defaultSearchSource:
+        profile.default_search_source ||
+        profile.search_sources?.[0]?.value ||
+        '',
+      detailPath: profile.detail_path || '',
+      label: profile.label || profile.key,
+      presentationType:
+        profile.presentation_type || profile.media_type || 'movie',
+      searchSources: Array.isArray(profile.search_sources)
+        ? profile.search_sources.filter((item) => item?.label && item?.value)
+        : [],
+    };
+  }
+}
+
 export interface PluginManifestFrontend {
   id: string;
   name: string;
   version: string;
   enabled: boolean;
   frontend: {
+    content_profiles?: Array<{
+      key: string;
+      label: string;
+      presentation_type?: string;
+      /** @deprecated 旧 manifest 字段，读取时兼容 */
+      media_type?: string;
+      detail_path?: string;
+      default_search_source?: string;
+      search_sources?: Array<{ label: string; value: string }>;
+    }>;
     routes: Array<{
       component: string;
       icon: string;
       menu: boolean;
+      order?: number;
+      parent?: string;
       path: string;
+      permission?: string;
       title: string;
     }>;
     slots: Array<{
@@ -191,28 +311,38 @@ export function getComponent(
  * 注册插件路由
  */
 function registerPluginRoutes(plugin: PluginManifestFrontend) {
-  const routes: RouteRecordRaw[] = [];
+  const routes: Array<{ parentName: string; route: RouteRecordRaw }> = [];
 
   for (const route of plugin.frontend.routes) {
-    const childPath = route.path.startsWith('/')
-      ? route.path.slice(1)
-      : `${plugin.id}/${route.path}`;
-    const routeName = `Plugin_${plugin.id}_${route.path.replaceAll('/', '_')}`;
-
-    const routeDef: RouteRecordRaw = {
-      name: routeName,
-      path: childPath,
-      component: () => loadPluginComponent(plugin.id, route.component),
-      meta: {
-        icon: route.icon || 'lucide:puzzle',
-        title: route.title || plugin.name,
-        hideInMenu: !route.menu,
-      },
+    const absolute = route.path.startsWith('/');
+    const fullPath = absolute
+      ? route.path
+      : `/plugin/${plugin.id}/${route.path}`;
+    pluginPathComponents[fullPath] = {
+      pluginId: plugin.id,
+      componentName: route.component,
     };
-    routes.push(routeDef);
+    if (route.menu) continue;
+
+    const routeName = `Plugin_${plugin.id}_${route.path.replaceAll('/', '_')}`;
+    routes.push({
+      parentName: absolute ? 'Root' : 'Plugin',
+      route: {
+        name: routeName,
+        path: absolute ? route.path.slice(1) : `${plugin.id}/${route.path}`,
+        component: () => loadPluginComponent(plugin.id, route.component),
+        meta: {
+          icon: route.icon || 'lucide:puzzle',
+          title: route.title || plugin.name,
+          hideInMenu: true,
+        },
+      },
+    });
   }
 
-  if (routes.length > 0) {
+  if (routes.length === 0) return;
+
+  if (routes.some((item) => item.parentName === 'Plugin')) {
     const pluginParent = router.getRoutes().find((r) => r.name === 'Plugin');
     if (!pluginParent) {
       router.addRoute('Root', {
@@ -226,16 +356,20 @@ function registerPluginRoutes(plugin: PluginManifestFrontend) {
         children: [],
       });
     }
-    for (const r of routes) {
-      router.removeRoute(r.name as string);
-      router.addRoute('Plugin', r);
-    }
-    pluginRoutes.set(plugin.id, routes);
-    console.warn(
-      `[PluginLoader] 插件 ${plugin.id} 路由已注册:`,
-      routes.map((r) => r.path),
-    );
   }
+
+  for (const item of routes) {
+    router.removeRoute(item.route.name as string);
+    router.addRoute(item.parentName, item.route);
+  }
+  pluginRoutes.set(
+    plugin.id,
+    routes.map((item) => item.route),
+  );
+  console.warn(
+    `[PluginLoader] 插件 ${plugin.id} 隐藏路由已注册:`,
+    routes.map((item) => item.route.path),
+  );
 }
 
 /**
@@ -330,6 +464,8 @@ export async function loadPluginFrontend(
         Object.keys(components || {}),
       );
     }
+
+    registerContentProfiles(plugin);
 
     // 注册路由
     if (plugin.frontend.routes?.length > 0) {
