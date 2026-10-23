@@ -1,9 +1,11 @@
 <script lang="ts" setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 
 import { NButton, NTag } from 'naive-ui';
+
+import { getImgUrl } from '#/utils/image';
 
 interface Props {
   detail: Record<string, any>;
@@ -29,6 +31,19 @@ const emit = defineEmits<{
 }>();
 
 const isTv = computed(() => props.detail.type !== 'movie');
+
+const posterSrc = computed(() =>
+  imageUrl(props.detail.image || props.detail.poster),
+);
+const posterStatus = ref<'error' | 'loaded' | 'loading'>('loading');
+
+watch(
+  posterSrc,
+  (src) => {
+    posterStatus.value = src ? 'loading' : 'error';
+  },
+  { immediate: true },
+);
 
 const tmdbUrl = computed(() => {
   const tid = props.detail.tmdbid;
@@ -75,7 +90,7 @@ function imageUrl(url?: any) {
   if (!url) return '';
   const s = String(url);
   if (s.startsWith('/img/') || s.startsWith('/img?')) return s;
-  if (/^https?:\/\//.test(s)) return `/img?url=${encodeURIComponent(s)}`;
+  if (/^https?:\/\//.test(s)) return getImgUrl(s);
   return replaceLocalhost(s);
 }
 </script>
@@ -108,22 +123,37 @@ function imageUrl(url?: any) {
     <div class="relative flex flex-col gap-6 p-6 md:flex-row">
       <!-- 海报 -->
       <div class="shrink-0">
-        <img
-          v-if="detail.image || detail.poster"
-          :src="imageUrl(detail.image || detail.poster)"
-          class="mx-auto h-64 w-44 rounded-xl object-cover shadow-xl md:mx-0 md:h-80 md:w-52"
-          alt="poster"
-        />
         <div
-          v-else
-          class="mx-auto flex h-64 w-44 items-center justify-center rounded-xl md:mx-0 md:h-80 md:w-52"
+          class="relative mx-auto h-64 w-44 overflow-hidden rounded-xl shadow-xl md:mx-0 md:h-80 md:w-52"
           style="background: hsl(var(--muted))"
         >
-          <IconifyIcon
-            icon="lucide:image"
-            class="size-12 opacity-40"
-            style="color: hsl(var(--muted-foreground))"
+          <img
+            v-if="posterSrc && posterStatus !== 'error'"
+            :src="posterSrc"
+            :alt="detail.title || 'poster'"
+            class="h-full w-full object-cover transition-opacity duration-300"
+            :style="{ opacity: posterStatus === 'loaded' ? 1 : 0 }"
+            decoding="async"
+            fetchpriority="high"
+            @load="posterStatus = 'loaded'"
+            @error="posterStatus = 'error'"
           />
+          <div
+            v-if="posterStatus === 'loading'"
+            class="absolute inset-0 animate-pulse"
+            style="background: hsl(var(--muted))"
+            aria-hidden="true"
+          ></div>
+          <div
+            v-if="!posterSrc || posterStatus === 'error'"
+            class="absolute inset-0 flex items-center justify-center"
+          >
+            <IconifyIcon
+              icon="lucide:image"
+              class="size-12 opacity-40"
+              style="color: hsl(var(--muted-foreground))"
+            />
+          </div>
         </div>
       </div>
 
