@@ -50,6 +50,7 @@ import {
   getContentProfileDefaultSearchSource,
   getContentProfileDetailPath,
   getContentProfileLabel,
+  getContentProfilePosterPosition,
   getContentProfileSearchSources,
   getContentProfileSourceOptions,
 } from '#/plugin-framework';
@@ -1597,6 +1598,11 @@ async function confirmDownload() {
               <img
                 :src="getImgUrl(media.image || media.poster)"
                 class="w-full h-full object-cover"
+                :style="{
+                  objectPosition:
+                    getContentProfilePosterPosition(media.content_profile) ||
+                    '50% 50%',
+                }"
                 alt=""
                 @error="
                   (e: any) => {
@@ -1766,6 +1772,11 @@ async function confirmDownload() {
               >
                 <img
                   :src="getImgUrl(item.poster)"
+                  :style="{
+                    objectPosition:
+                      getContentProfilePosterPosition(item.content_profile) ||
+                      '50% 50%',
+                  }"
                   alt=""
                   @error="
                     (e: any) => {
