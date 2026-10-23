@@ -111,6 +111,22 @@ function goDetail() {
   const t = props.mediaType || props.type || 'movie';
   const typeParam =
     t === '电影' ? 'movie' : t === '剧集' ? 'tv' : t.toLowerCase();
+  if (
+    props.anchorProvider &&
+    props.anchorProvider !== 'tmdb' &&
+    props.anchorProvider !== 'content_id' &&
+    props.anchorExternalId
+  ) {
+    router.push({
+      name: 'MediaDetail',
+      query: {
+        provider: props.anchorProvider,
+        ref: props.anchorExternalId,
+        type: typeParam,
+      },
+    });
+    return;
+  }
   router.push({
     name: 'MediaDetail',
     query: { id: mediaId.value, type: typeParam },

@@ -169,7 +169,21 @@ async function fetchDownloadSettings() {
 
 // ---------- 卡片操作 ----------
 function handleCardClick(item: any) {
-  const id = item.tmdbid || item.id;
+  const provider = String(item.anchor_provider || '').trim();
+  const externalId = String(item.anchor_external_id || '').trim();
+  if (
+    provider &&
+    provider !== 'tmdb' &&
+    provider !== 'content_id' &&
+    externalId
+  ) {
+    router.push({
+      name: 'MediaDetail',
+      query: { provider, ref: externalId, type: 'movie' },
+    });
+    return;
+  }
+  const id = item.tmdbid;
   if (!id) return;
   router.push({ name: 'MediaDetail', query: { type: 'movie', id } });
 }

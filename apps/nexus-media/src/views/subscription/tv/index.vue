@@ -195,7 +195,21 @@ async function fetchDownloadSettings() {
 }
 
 function handleCardClick(item: any) {
-  const id = item.tmdbid || item.id;
+  const provider = String(item.anchor_provider || '').trim();
+  const externalId = String(item.anchor_external_id || '').trim();
+  if (
+    provider &&
+    provider !== 'tmdb' &&
+    provider !== 'content_id' &&
+    externalId
+  ) {
+    router.push({
+      name: 'MediaDetail',
+      query: { provider, ref: externalId, type: 'tv' },
+    });
+    return;
+  }
+  const id = item.tmdbid;
   if (!id) return;
   router.push({ name: 'MediaDetail', query: { type: 'tv', id } });
 }
