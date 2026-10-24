@@ -406,7 +406,8 @@ onMounted(ensureOutsideListener);
 
         <!-- 关键词 -->
         <div v-if="keyword" class="shc-keyword" :title="keyword">
-          关键词: {{ keyword }}
+          <span class="shc-keyword-label">关键词</span>
+          <span class="shc-keyword-value">{{ keyword }}</span>
         </div>
 
         <!-- 过滤设置 -->
@@ -1020,16 +1021,32 @@ onMounted(ensureOutsideListener);
 }
 
 .shc-keyword {
-  padding: 0.3rem 0.55rem;
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 0.18rem 0.45rem;
   margin-bottom: 0.55rem;
   overflow: hidden;
-  text-overflow: ellipsis;
   font-size: 11px;
-  color: hsl(var(--muted-foreground));
+  line-height: 1.5;
   white-space: nowrap;
-  background: hsl(var(--muted) / 40%);
-  border: 1px solid hsl(var(--border));
-  border-radius: 9999px;
+  background: hsl(var(--muted) / 28%);
+  border: 1px solid hsl(var(--border) / 70%);
+  border-radius: 0.375rem;
+}
+
+.shc-keyword-label {
+  flex-shrink: 0;
+  font-weight: 500;
+  color: hsl(var(--foreground) / 45%);
+}
+
+.shc-keyword-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: hsl(var(--card-foreground) / 75%);
 }
 
 :deep(.tag-rss-site) {
