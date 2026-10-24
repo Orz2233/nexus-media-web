@@ -858,27 +858,37 @@ async function handleResultSubscribe(item: SearchResult) {
     return;
   }
   const code = item.title;
+  const preferredProvider =
+    getContentProfileDefaultSearchSource(item.content_profile) ||
+    item.provider ||
+    metadataSource.value ||
+    '';
   let metadataRef = item.metadata_ref;
+  let metadataTitle = item.title;
   try {
-    if (!metadataRef) {
+    if (!metadataRef || metadataRef.startsWith('tmdb:')) {
       const res: any = await searchMetadataApi({
         content_profile: item.content_profile,
         limit: 1,
-        provider: item.provider || metadataSource.value || undefined,
+        provider: preferredProvider || undefined,
         query: code,
       });
       const list = Array.isArray(res) ? res : res?.data || [];
       const hit = list.find((entry: any) => entry?.ref?.external_id);
       if (hit?.ref) {
         metadataRef = `${hit.ref.provider}:${hit.ref.external_id}`;
+        metadataTitle = hit.title || metadataTitle;
       }
+    }
+    if (!metadataRef || metadataRef.startsWith('tmdb:')) {
+      metadataRef = `${preferredProvider || item.content_profile || 'content_id'}:${code}`;
     }
     await addSubscriptionMediaApi({
       content_profile: item.content_profile,
       mediaid: `content_id:${code}`,
       metadata_policy: `provider_only:${item.content_profile}`,
       metadata_ref: metadataRef,
-      name: code,
+      name: metadataTitle,
       type: 'movie',
       year: item.year || '',
     });

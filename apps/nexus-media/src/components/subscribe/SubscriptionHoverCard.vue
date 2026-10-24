@@ -25,6 +25,7 @@ import { IconifyIcon } from '@vben/icons';
 
 import { NTag } from 'naive-ui';
 
+import { getContentProfilePosterPosition } from '#/plugin-framework/loader';
 import { getImgUrl } from '#/utils/image';
 import { formatPix, formatRestype } from '#/utils/subscribe';
 
@@ -82,6 +83,11 @@ const typeLabel = computed(() => {
       ? '动漫'
       : '剧集';
 });
+
+const posterPosition = computed(
+  () =>
+    getContentProfilePosterPosition(props.item.content_profile) || '50% 50%',
+);
 
 const voteText = computed(() => {
   const v = props.item.vote;
@@ -320,6 +326,7 @@ onMounted(ensureOutsideListener);
       <img
         :src="getImgUrl(item.image || item.poster)"
         class="shc-poster-img"
+        :style="{ objectPosition: posterPosition }"
         alt=""
         @error="onImgError"
       />
@@ -677,12 +684,12 @@ onMounted(ensureOutsideListener);
 }
 
 .shc-poster-source {
+  margin-bottom: 2px;
   font-size: 10px;
   line-height: 1.2;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: hsl(var(--primary-foreground) / 72%);
-  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .shc-poster-title {

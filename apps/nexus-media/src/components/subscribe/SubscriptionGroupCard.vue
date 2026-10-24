@@ -22,6 +22,7 @@ import { computed, onMounted } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 
+import { getContentProfilePosterPosition } from '#/plugin-framework/loader';
 import { getImgUrl } from '#/utils/image';
 import { formatPix, formatRestype } from '#/utils/subscribe';
 
@@ -89,6 +90,11 @@ const captionTitle = computed(() => {
 });
 
 const subscriberCount = computed(() => props.items.length);
+const posterPosition = computed(
+  () =>
+    getContentProfilePosterPosition(props.items[0]?.content_profile) ||
+    '50% 50%',
+);
 
 const sourceText = computed(() => {
   const labels = new Set<string>();
@@ -247,6 +253,7 @@ onMounted(ensureOutsideListener);
       <img
         :src="getImgUrl(image)"
         class="sgc-poster-img"
+        :style="{ objectPosition: posterPosition }"
         alt=""
         @error="onImgError"
       />
@@ -491,12 +498,12 @@ onMounted(ensureOutsideListener);
 }
 
 .sgc-poster-source {
+  margin-bottom: 2px;
   font-size: 10px;
   line-height: 1.2;
-  letter-spacing: 0.08em;
   color: hsl(var(--primary-foreground) / 72%);
   text-transform: uppercase;
-  margin-bottom: 2px;
+  letter-spacing: 0.08em;
 }
 
 .sgc-poster-title {
