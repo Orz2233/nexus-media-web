@@ -97,6 +97,11 @@ const subscribeMediaId = computed(() => {
   if (!provider) return String(props.tmdbId || props.id);
   if (provider === 'douban') return `DB:${externalId}`;
   if (provider === 'bangumi') return `BG:${externalId}`;
+  if (provider === 'content_id') {
+    // 内容编号是身份锚点；订阅来源仍取实际 provider（如 JavDB）。
+    const sourceProvider = String(props.metadataRef || '').split(':')[0];
+    return `${sourceProvider || 'content_id'}:${externalId}`;
+  }
   return `${provider}:${externalId}`;
 });
 

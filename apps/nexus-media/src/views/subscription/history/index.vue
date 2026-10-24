@@ -13,6 +13,12 @@ import {
 } from '#/api';
 import EmptyState from '#/components/empty/EmptyState.vue';
 import PageHeader from '#/components/page/PageHeader.vue';
+import {
+  getContentProfileDetailPath,
+  getContentProfileLabel,
+  getContentProfileMediaType,
+  getContentProfileOptions,
+} from '#/plugin-framework/loader';
 import { useSubscriptionStore } from '#/store';
 import { useAppNotification } from '#/utils/notify';
 
@@ -27,21 +33,70 @@ const loading = ref(false);
 const deleteModalShow = ref(false);
 const deleteTarget = ref<any>(null);
 
-const filterType = ref<'movie' | 'tv'>(
-  String(route.query.t || '').toLowerCase() === 'tv' ? 'tv' : 'movie',
-);
+type HistoryTab = {
+  key: string;
+  label: string;
+  profile: string;
+  type: 'movie' | 'tv';
+};
 
-const pageTitle = computed(() =>
-  filterType.value === 'tv' ? '电视剧订阅历史' : '电影订阅历史',
-);
+const historyTabs = computed<HistoryTab[]>(() => {
+  const tabs: HistoryTab[] = [
+    { key: 'movie', label: '电影', profile: 'default', type: 'movie' },
+    { key: 'tv', label: '电视剧', profile: 'default', type: 'tv' },
+    {
+      key: 'anime',
+      label: getContentProfileLabel('anime') || '动漫',
+      profile: 'anime',
+      type: 'tv',
+    },
+  ];
+  for (const option of getContentProfileOptions()) {
+    if (['anime', 'default'].includes(option.value)) continue;
+    const mediaType = getContentProfileMediaType(option.value);
+    tabs.push({
+      key: option.value,
+      label: option.label,
+      profile: option.value,
+      type: mediaType === 'tv' ? 'tv' : 'movie',
+    });
+  }
+  return tabs;
+});
 
-const backPath = computed(() =>
-  filterType.value === 'tv' ? '/subscription/tv' : '/subscription/movie',
+const requestedTab = String(route.query.t || '').toLowerCase();
+const activeKey = ref(
+  historyTabs.value.some((tab) => tab.key === requestedTab)
+    ? requestedTab
+    : 'movie',
 );
+const FALLBACK_TAB: HistoryTab = {
+  key: 'movie',
+  label: '电影',
+  profile: 'default',
+  type: 'movie',
+};
+const activeTab = computed<HistoryTab>(
+  () =>
+    historyTabs.value.find((tab) => tab.key === activeKey.value) ||
+    historyTabs.value[0] ||
+    FALLBACK_TAB,
+);
+const filterType = computed(() => activeTab.value.type);
+const filterProfile = computed(() => activeTab.value.profile);
+const pageTitle = computed(() => `${activeTab.value.label}订阅历史`);
+const backPath = computed(() => {
+  if (activeTab.value.profile !== 'default') {
+    return (
+      getContentProfileDetailPath(activeTab.value.profile) || '/subscription/tv'
+    );
+  }
+  return filterType.value === 'tv' ? '/subscription/tv' : '/subscription/movie';
+});
 
-function handleTypeChange(value: 'movie' | 'tv') {
-  if (value === filterType.value) return;
-  filterType.value = value;
+function handleTypeChange(value: string) {
+  if (value === activeKey.value) return;
+  activeKey.value = value;
   fetchData();
 }
 
@@ -64,7 +119,10 @@ const historyList = computed(() => {
 async function fetchData() {
   loading.value = true;
   try {
-    const res = await getSubscriptionHistoryApi(filterType.value);
+    const res = await getSubscriptionHistoryApi(
+      filterType.value,
+      filterProfile.value,
+    );
     subscriptionStore.setSubscriptionHistory(res);
   } finally {
     loading.value = false;
@@ -112,13 +170,17 @@ onMounted(fetchData);
     </PageHeader>
 
     <NTabs
-      :value="filterType"
+      :value="activeKey"
       type="segment"
       class="history-tabs"
       @update:value="handleTypeChange"
     >
-      <NTab name="movie" tab="电影" />
-      <NTab name="tv" tab="电视剧" />
+      <NTab
+        v-for="tab in historyTabs"
+        :key="tab.key"
+        :name="tab.key"
+        :tab="tab.label"
+      />
     </NTabs>
 
     <NSpin :show="loading">

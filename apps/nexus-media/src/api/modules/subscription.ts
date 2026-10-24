@@ -173,10 +173,13 @@ export async function getSubscriptionDetailApi(
 }
 
 /** 获取订阅历史 */
-export async function getSubscriptionHistoryApi(type?: 'movie' | 'tv') {
+export async function getSubscriptionHistoryApi(
+  type?: 'movie' | 'tv',
+  contentProfile?: string,
+) {
   return requestClient.post<SubscriptionApi.SubscriptionHistory[]>(
     '/subscription/history',
-    { type },
+    { type, content_profile: contentProfile },
   );
 }
 
