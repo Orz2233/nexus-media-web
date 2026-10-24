@@ -213,7 +213,6 @@ const hasFilterInfo = computed(
     !!props.item.filter_include ||
     !!props.item.filter_exclude ||
     !!downloadLabel.value ||
-    !!keyword.value ||
     freeOnly.value,
 );
 
@@ -405,6 +404,11 @@ onMounted(ensureOutsideListener);
         <!-- 简介 -->
         <p v-if="overviewText" class="shc-overview">{{ overviewText }}</p>
 
+        <!-- 关键词 -->
+        <div v-if="keyword" class="shc-keyword" :title="keyword">
+          关键词: {{ keyword }}
+        </div>
+
         <!-- 过滤设置 -->
         <div v-if="hasFilterInfo" class="shc-section">
           <div class="shc-section-label">过滤设置</div>
@@ -453,14 +457,6 @@ onMounted(ensureOutsideListener);
             </NTag>
             <NTag v-if="downloadLabel" size="tiny" class="tag-download">
               {{ downloadLabel }}
-            </NTag>
-            <NTag
-              v-if="keyword"
-              size="tiny"
-              class="tag-keyword"
-              :title="keyword"
-            >
-              关键词: {{ keyword }}
             </NTag>
           </div>
         </div>
@@ -1023,11 +1019,16 @@ onMounted(ensureOutsideListener);
   border-radius: 9999px;
 }
 
-:deep(.tag-keyword) {
-  --n-color: hsl(var(--muted) / 40%) !important;
-  --n-text-color: hsl(var(--muted-foreground)) !important;
-  --n-border: 1px solid hsl(var(--border)) !important;
-
+.shc-keyword {
+  padding: 0.3rem 0.55rem;
+  margin-bottom: 0.55rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+  background: hsl(var(--muted) / 40%);
+  border: 1px solid hsl(var(--border));
   border-radius: 9999px;
 }
 
