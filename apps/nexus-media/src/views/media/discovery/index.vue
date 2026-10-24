@@ -6,7 +6,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { IconifyIcon } from '@vben/icons';
 
-import { NButton, NSelect, NSpin } from 'naive-ui';
+import { NButton, NSpin } from 'naive-ui';
 
 import { getDiscoveryItemsApi, getDiscoveryProvidersApi } from '#/api';
 import EmptyState from '#/components/empty/EmptyState.vue';
@@ -30,14 +30,33 @@ const hasMore = ref(false);
 const loading = ref(false);
 const loadingMore = ref(false);
 const loadingSources = ref(true);
-const selectedSeason = ref(currentSeason());
-const selectedYear = ref('');
+const selectedSeasonQuarter = ref(currentSeason().split('-q')[1]);
+const selectedYear = ref(String(new Date().getFullYear()));
+const selectedSeason = computed(
+  () =>
+    `${selectedYear.value || new Date().getFullYear()}-q${selectedSeasonQuarter.value}`,
+);
+const selectedWeekday = ref('');
+const selectedGenre = ref('');
+const genreOptions = ref<Array<{ label: string; value: string }>>([]);
+const genreOptionsFeed = ref('');
+const weekdayOptions = [
+  { label: '全部', value: '' },
+  { label: '周一', value: '1' },
+  { label: '周二', value: '2' },
+  { label: '周三', value: '3' },
+  { label: '周四', value: '4' },
+  { label: '周五', value: '5' },
+  { label: '周六', value: '6' },
+  { label: '周日', value: '7' },
+];
 const sentinelRef = ref<HTMLElement | null>(null);
 let loadMoreObserver: IntersectionObserver | null = null;
 let scrollCheckFrame = 0;
 const PREF_KEY = 'nexus.discovery.preference';
 
 const pageTitleMap: Record<string, string> = {
+  DiscoveryAll: '排行榜',
   Ranking: '排行榜',
   Bangumi: 'Bangumi 新番',
   DoubanMovie: '豆瓣电影',
@@ -86,11 +105,15 @@ const supportsSeason = computed(() =>
 const supportsYear = computed(() =>
   (activeFeedConfig.value?.facets || []).includes('year'),
 );
-const facetLabel = computed(() => {
-  if (supportsYear.value && !supportsSeason.value) return '年份';
-  if (supportsSeason.value && !supportsYear.value) return '季度';
-  return '筛选';
-});
+const supportsWeekday = computed(() =>
+  (activeFeedConfig.value?.facets || []).includes('weekday'),
+);
+const supportsGenre = computed(() =>
+  (activeFeedConfig.value?.facets || []).includes('genre'),
+);
+const hasGenreOptions = computed(() =>
+  genreOptions.value.some((item) => item.value !== '其他'),
+);
 const yearOptions = computed(() => {
   const current = new Date().getFullYear();
   const values = [{ label: '全部年份', value: '' }];
@@ -109,27 +132,18 @@ const visibleYearOptions = computed(() =>
 const hiddenYearCount = computed(() =>
   Math.max(0, yearOptions.value.length - COLLAPSED_YEAR_COUNT),
 );
-const seasonOptions = computed(() => {
-  const current = new Date();
-  const values: { label: string; value: string }[] = [];
-  for (
-    let year = current.getFullYear() + 1;
-    year >= current.getFullYear() - 1;
-    year--
-  ) {
-    for (let quarter = 4; quarter >= 1; quarter--) {
-      values.push({
-        label: `${year} Q${quarter}`,
-        value: `${year}-q${quarter}`,
-      });
-    }
-  }
-  return values;
-});
 
 function currentSeason() {
   const now = new Date();
   return `${now.getFullYear()}-q${Math.floor(now.getMonth() / 3) + 1}`;
+}
+
+function selectSeasonQuarter(value: string) {
+  selectedSeasonQuarter.value = value;
+  if (!selectedYear.value) {
+    selectedYear.value = String(new Date().getFullYear());
+  }
+  loadItems(true);
 }
 
 function unwrap<T>(res: any): T {
@@ -199,10 +213,38 @@ async function loadItems(reset = false) {
           ...(supportsYear.value && selectedYear.value
             ? { year: selectedYear.value }
             : {}),
+          ...(supportsWeekday.value && selectedWeekday.value
+            ? { weekday: selectedWeekday.value }
+            : {}),
+          ...(supportsGenre.value && selectedGenre.value
+            ? { genre: selectedGenre.value }
+            : {}),
         },
       }),
     );
     if (seq !== loadSeq) return;
+    if (supportsGenre.value) {
+      // 题材是 feed 级目录：只在首次加载/切换 feed 时刷新，避免翻页或筛选后被当前页结果改写。
+      const feedKey = `${provider}:${feed}`;
+      if (genreOptionsFeed.value !== feedKey) {
+        const facets: any[] = (result as any)?.facets?.genre || [];
+        if (facets.length) {
+          genreOptions.value = facets.map((item) => ({
+            label: String(item.label || item.value),
+            value: String(item.value),
+          }));
+          if (
+            selectedGenre.value &&
+            !genreOptions.value.some(
+              (item) => item.value === selectedGenre.value,
+            )
+          ) {
+            selectedGenre.value = '';
+          }
+          genreOptionsFeed.value = feedKey;
+        }
+      }
+    }
     const list = result?.items || [];
     const merged = reset ? list : [...items.value, ...list];
     const seen = new Set<string>();
@@ -227,6 +269,10 @@ function selectProvider(provider: string) {
   activeFeed.value =
     sources.value.find((item) => item.provider === provider)?.feeds[0]?.key ||
     '';
+  selectedWeekday.value = '';
+  selectedGenre.value = '';
+  genreOptions.value = [];
+  genreOptionsFeed.value = '';
   savePreference();
   loadItems(true);
 }
@@ -234,6 +280,10 @@ function selectProvider(provider: string) {
 function selectFeed(feed: string) {
   if (feed === activeFeed.value) return;
   activeFeed.value = feed;
+  selectedWeekday.value = '';
+  selectedGenre.value = '';
+  genreOptions.value = [];
+  genreOptionsFeed.value = '';
   savePreference();
   loadItems(true);
 }
@@ -322,13 +372,18 @@ function savePreference() {
   );
 }
 
-function selectSeason(value: string) {
-  selectedSeason.value = value;
+function selectYear(value: string) {
+  selectedYear.value = value;
   loadItems(true);
 }
 
-function selectYear(value: string) {
-  selectedYear.value = value;
+function selectWeekday(value: string) {
+  selectedWeekday.value = value;
+  loadItems(true);
+}
+
+function selectGenre(value: string) {
+  selectedGenre.value = value;
   loadItems(true);
 }
 
@@ -487,56 +542,110 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div v-if="supportsSeason || supportsYear" class="filter-divider"></div>
+        <template v-if="supportsYear">
+          <div class="filter-divider"></div>
+          <div class="filter-row filter-row--facets">
+            <span class="filter-label">年份</span>
+            <div class="facet-group">
+              <div class="facet facet--years">
+                <div class="year-list">
+                  <button
+                    v-for="year in visibleYearOptions"
+                    :key="year.value || 'all'"
+                    type="button"
+                    class="year-tab"
+                    :class="{ active: selectedYear === year.value }"
+                    :aria-pressed="selectedYear === year.value"
+                    @click="selectYear(year.value)"
+                  >
+                    {{ year.label === '全部年份' ? '全部' : year.label }}
+                  </button>
+                  <button
+                    v-if="hiddenYearCount > 0 || yearsExpanded"
+                    type="button"
+                    class="feed-toggle"
+                    @click="yearsExpanded = !yearsExpanded"
+                  >
+                    <IconifyIcon
+                      :icon="
+                        yearsExpanded
+                          ? 'lucide:chevron-up'
+                          : 'lucide:chevron-down'
+                      "
+                      class="feed-toggle-icon"
+                    />
+                    {{ yearsExpanded ? '收起' : '更多' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
 
-        <div
-          v-if="supportsSeason || supportsYear"
-          class="filter-row filter-row--facets"
-        >
-          <span class="filter-label">{{ facetLabel }}</span>
-          <div class="facet-group">
-            <label v-if="supportsSeason" class="facet">
-              <span v-if="facetLabel !== '季度'">季度</span>
-              <NSelect
-                :value="selectedSeason"
-                :options="seasonOptions"
-                style="width: 132px"
-                size="small"
-                @update:value="selectSeason"
-              />
-            </label>
-            <div v-if="supportsYear" class="facet facet--years">
-              <span v-if="facetLabel !== '年份'">年份</span>
+        <template v-if="supportsSeason">
+          <div class="filter-divider"></div>
+          <div class="filter-row filter-row--facets">
+            <span class="filter-label">季度</span>
+            <div class="facet-group">
               <div class="year-list">
                 <button
-                  v-for="year in visibleYearOptions"
-                  :key="year.value || 'all'"
+                  v-for="quarter in ['1', '2', '3', '4']"
+                  :key="quarter"
                   type="button"
                   class="year-tab"
-                  :class="{ active: selectedYear === year.value }"
-                  :aria-pressed="selectedYear === year.value"
-                  @click="selectYear(year.value)"
+                  :class="{ active: selectedSeasonQuarter === quarter }"
+                  :aria-pressed="selectedSeasonQuarter === quarter"
+                  @click="selectSeasonQuarter(quarter)"
                 >
-                  {{ year.label === '全部年份' ? '全部' : year.label }}
-                </button>
-                <button
-                  v-if="hiddenYearCount > 0 || yearsExpanded"
-                  type="button"
-                  class="feed-toggle"
-                  @click="yearsExpanded = !yearsExpanded"
-                >
-                  <IconifyIcon
-                    :icon="
-                      yearsExpanded
-                        ? 'lucide:chevron-up'
-                        : 'lucide:chevron-down'
-                    "
-                    class="feed-toggle-icon"
-                  />
-                  {{ yearsExpanded ? '收起' : '更多' }}
+                  Q{{ quarter }}
                 </button>
               </div>
             </div>
+          </div>
+        </template>
+
+        <div v-if="supportsWeekday" class="filter-row filter-row--wrap">
+          <span class="filter-label">放送日</span>
+          <div class="year-list">
+            <button
+              v-for="day in weekdayOptions"
+              :key="day.value || 'all'"
+              type="button"
+              class="year-tab"
+              :class="{ active: selectedWeekday === day.value }"
+              :aria-pressed="selectedWeekday === day.value"
+              @click="selectWeekday(day.value)"
+            >
+              {{ day.value ? day.label : '全部' }}
+            </button>
+          </div>
+        </div>
+        <div
+          v-if="supportsGenre && hasGenreOptions"
+          class="filter-row filter-row--wrap"
+        >
+          <span class="filter-label">题材</span>
+          <div class="year-list">
+            <button
+              type="button"
+              class="year-tab"
+              :class="{ active: selectedGenre === '' }"
+              :aria-pressed="selectedGenre === ''"
+              @click="selectGenre('')"
+            >
+              全部
+            </button>
+            <button
+              v-for="genre in genreOptions"
+              :key="genre.value"
+              type="button"
+              class="year-tab"
+              :class="{ active: selectedGenre === genre.value }"
+              :aria-pressed="selectedGenre === genre.value"
+              @click="selectGenre(genre.value)"
+            >
+              {{ genre.label }}
+            </button>
           </div>
         </div>
       </section>

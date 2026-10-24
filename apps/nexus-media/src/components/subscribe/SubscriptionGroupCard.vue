@@ -90,6 +90,33 @@ const captionTitle = computed(() => {
 
 const subscriberCount = computed(() => props.items.length);
 
+const sourceText = computed(() => {
+  const labels = new Set<string>();
+  for (const item of props.items) {
+    const declared = String(item.source_label || '').trim();
+    if (declared) {
+      labels.add(declared);
+      continue;
+    }
+    let provider = String(item.anchor_provider || '').trim();
+    if (!provider) {
+      const profile = String(item.content_profile || '').trim();
+      const mediaid = String(item.mediaid || '').trim();
+      if (profile && profile !== 'default') provider = 'content_id';
+      else if (mediaid.startsWith('DB:')) provider = 'douban';
+      else if (mediaid.startsWith('BG:')) provider = 'bangumi';
+      else if (item.tmdbid) provider = 'tmdb';
+    }
+    if (!provider) continue;
+    if (provider === 'content_id') labels.add('插件');
+    else if (provider === 'tmdb') labels.add('TMDB');
+    else if (provider === 'douban') labels.add('豆瓣');
+    else if (provider === 'bangumi') labels.add('Bangumi');
+    else labels.add(provider.toUpperCase());
+  }
+  return [...labels].join(' / ') || '未知';
+});
+
 const typeText = computed(() => {
   if (props.typeLabel) return props.typeLabel;
   return props.type === 'movie'
@@ -241,6 +268,7 @@ onMounted(ensureOutsideListener);
 
       <!-- 底部渐变：标题 + 订阅者头像 -->
       <div class="sgc-poster-caption">
+        <div v-if="sourceText" class="sgc-poster-source">{{ sourceText }}</div>
         <div class="sgc-poster-title" :title="captionTitle">
           {{ captionTitle }}
         </div>
@@ -272,6 +300,10 @@ onMounted(ensureOutsideListener);
           <span v-if="year">{{ year }}</span>
           <span class="sgc-dot-sep">·</span>
           <span>{{ typeText }}</span>
+          <template v-if="sourceText">
+            <span class="sgc-dot-sep">·</span>
+            <span>{{ sourceText }}</span>
+          </template>
           <template v-if="seasonLabel">
             <span class="sgc-dot-sep">·</span>
             <span>{{ seasonLabel }}</span>
@@ -456,6 +488,15 @@ onMounted(ensureOutsideListener);
   color: hsl(0deg 0% 100%);
   background: linear-gradient(transparent, hsl(0deg 0% 0% / 82%));
   transition: opacity 0.2s ease-out;
+}
+
+.sgc-poster-source {
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  color: hsl(var(--primary-foreground) / 72%);
+  text-transform: uppercase;
+  margin-bottom: 2px;
 }
 
 .sgc-poster-title {

@@ -106,6 +106,26 @@ const ownerInitial = computed(() =>
   ownerName.value ? ownerName.value.slice(0, 1).toUpperCase() : '',
 );
 
+const sourceText = computed(() => {
+  const declared = String(props.item.source_label || '').trim();
+  if (declared) return declared;
+  let provider = String(props.item.anchor_provider || '').trim();
+  if (!provider) {
+    const profile = String(props.item.content_profile || '').trim();
+    const mediaid = String(props.item.mediaid || '').trim();
+    if (profile && profile !== 'default') provider = 'content_id';
+    else if (mediaid.startsWith('DB:')) provider = 'douban';
+    else if (mediaid.startsWith('BG:')) provider = 'bangumi';
+    else if (props.item.tmdbid) provider = 'tmdb';
+  }
+  if (!provider) return '未知';
+  if (provider === 'content_id') return '插件';
+  if (provider === 'tmdb') return 'TMDB';
+  if (provider === 'douban') return '豆瓣';
+  if (provider === 'bangumi') return 'Bangumi';
+  return provider.toUpperCase();
+});
+
 const captionTitle = computed(() => {
   let text = props.item.name || '';
   if (props.type !== 'movie' && seasonLabel.value) {
@@ -321,6 +341,7 @@ onMounted(ensureOutsideListener);
 
       <!-- 默认态：底部渐变标题（展开时隐藏） -->
       <div class="shc-poster-caption">
+        <div class="shc-poster-source">{{ sourceText }}</div>
         <div class="shc-poster-title" :title="captionTitle">
           {{ captionTitle }}
         </div>
@@ -355,6 +376,8 @@ onMounted(ensureOutsideListener);
           <span v-if="item.year">{{ item.year }}</span>
           <span class="shc-dot">·</span>
           <span>{{ typeLabel }}</span>
+          <span class="shc-dot">·</span>
+          <span>{{ sourceText }}</span>
           <template v-if="seasonLabel">
             <span class="shc-dot">·</span>
             <span>{{ seasonLabel }}</span>
@@ -651,6 +674,15 @@ onMounted(ensureOutsideListener);
   color: hsl(0deg 0% 100%);
   background: linear-gradient(transparent, hsl(0deg 0% 0% / 82%));
   transition: opacity 0.2s ease-out;
+}
+
+.shc-poster-source {
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(var(--primary-foreground) / 72%);
+  margin-bottom: 2px;
 }
 
 .shc-poster-title {

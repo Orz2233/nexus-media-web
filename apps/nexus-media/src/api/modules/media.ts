@@ -761,6 +761,7 @@ export namespace DiscoveryApi {
     items: Item[];
     page: number;
     has_more: boolean;
+    facets?: Record<string, Array<{ label?: string; value: string }>>;
   }
 }
 
