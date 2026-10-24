@@ -114,6 +114,7 @@ const host = {
 
 /** 已加载的插件组件映射: pluginId -> { componentName: Component } */
 const loadedModules = new Map<string, Record<string, Component>>();
+const pluginFrontendVersions = new Map<string, string>();
 
 /** 插槽注册表: slotTarget -> { pluginId, componentName, name, icon, color }[] */
 const slotRegistry = reactive<
@@ -431,7 +432,9 @@ async function loadPluginComponent(
   if (comp) return comp;
 
   try {
-    const mjsUrl = `${PLUGIN_ASSET_BASE}/plugins/${pluginId}/assets/frontend/index.mjs`;
+    const version = pluginFrontendVersions.get(pluginId);
+    const suffix = version ? `?v=${encodeURIComponent(version)}` : '';
+    const mjsUrl = `${PLUGIN_ASSET_BASE}/plugins/${pluginId}/assets/frontend/index.mjs${suffix}`;
     const module = await import(/* @vite-ignore */ mjsUrl);
     const components =
       typeof module.default === 'function'
@@ -483,6 +486,7 @@ export async function loadPluginFrontend(
   plugin: PluginManifestFrontend,
 ): Promise<void> {
   if (!plugin.enabled) return;
+  pluginFrontendVersions.set(plugin.id, plugin.version || '');
 
   try {
     // 如果有前端组件，先 import ESM 模块
@@ -490,7 +494,10 @@ export async function loadPluginFrontend(
       plugin.frontend.routes?.length > 0 || plugin.frontend.slots?.length > 0;
 
     if (hasComponents) {
-      const mjsUrl = `${PLUGIN_ASSET_BASE}/plugins/${plugin.id}/assets/frontend/index.mjs`;
+      const suffix = plugin.version
+        ? `?v=${encodeURIComponent(plugin.version)}`
+        : '';
+      const mjsUrl = `${PLUGIN_ASSET_BASE}/plugins/${plugin.id}/assets/frontend/index.mjs${suffix}`;
       // 原生 import() 无超时，后端挂起时 Promise 永不 resolve，需手动兜底
       const module = await Promise.race([
         import(/* @vite-ignore */ mjsUrl),
