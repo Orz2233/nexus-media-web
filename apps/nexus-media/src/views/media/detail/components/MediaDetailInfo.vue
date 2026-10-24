@@ -1,0 +1,96 @@
+<script lang="ts" setup>
+import { IconifyIcon } from '@vben/icons';
+
+import { NTag } from 'naive-ui';
+
+import CastList from './CastList.vue';
+import FactPanel from './FactPanel.vue';
+
+interface Props {
+  actors?: string[];
+  detail: Record<string, any>;
+  genres?: string[];
+}
+
+withDefaults(defineProps<Props>(), {
+  actors: () => [],
+  genres: () => [],
+});
+</script>
+
+<template>
+  <div class="space-y-6">
+    <section
+      v-if="detail.overview"
+      class="rounded-2xl border p-5"
+      style="background: hsl(var(--card)); border-color: hsl(var(--border))"
+    >
+      <div class="mb-4 flex items-center gap-2">
+        <IconifyIcon
+          icon="lucide:align-left"
+          class="size-5"
+          style="color: hsl(var(--primary))"
+        />
+        <h2
+          class="text-lg font-semibold"
+          style="color: hsl(var(--card-foreground))"
+        >
+          简介
+        </h2>
+      </div>
+      <p
+        class="whitespace-pre-wrap text-sm leading-7"
+        style="color: hsl(var(--muted-foreground))"
+      >
+        {{ detail.overview }}
+      </p>
+    </section>
+
+    <section
+      v-if="actors.length > 0 || genres.length > 0"
+      class="rounded-2xl border p-5"
+      style="background: hsl(var(--card)); border-color: hsl(var(--border))"
+    >
+      <div v-if="actors.length > 0" class="mb-4">
+        <div
+          class="mb-2 text-sm font-medium"
+          style="color: hsl(var(--card-foreground))"
+        >
+          演员
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <NTag v-for="name in actors" :key="name" size="small">
+            {{ name }}
+          </NTag>
+        </div>
+      </div>
+      <div v-if="genres.length > 0">
+        <div
+          class="mb-2 text-sm font-medium"
+          style="color: hsl(var(--card-foreground))"
+        >
+          标签
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <NTag
+            v-for="name in genres"
+            :key="name"
+            size="small"
+            :bordered="false"
+          >
+            {{ name }}
+          </NTag>
+        </div>
+      </div>
+    </section>
+
+    <CastList
+      v-if="detail.crews && detail.crews.length > 0"
+      :crews="detail.crews"
+    />
+    <FactPanel
+      v-if="detail.fact && detail.fact.length > 0"
+      :facts="detail.fact"
+    />
+  </div>
+</template>

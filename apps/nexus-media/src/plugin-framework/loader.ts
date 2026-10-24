@@ -55,6 +55,7 @@ import SubscriptionGroupCard from '#/components/subscribe/SubscriptionGroupCard.
 import SubscriptionHoverCard from '#/components/subscribe/SubscriptionHoverCard.vue';
 import { router } from '#/router';
 import HeroSection from '#/views/media/detail/components/HeroSection.vue';
+import MediaDetailInfo from '#/views/media/detail/components/MediaDetailInfo.vue';
 import RenameFormatBuilder from '#/views/system/basic/components/RenameFormatBuilder.vue';
 
 const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);
@@ -95,6 +96,7 @@ const host = {
   NaiveUI,
   EmptyState,
   HeroSection,
+  MediaDetailInfo,
   PageHeader,
   RenameFormatBuilder,
   PathPickerModal,

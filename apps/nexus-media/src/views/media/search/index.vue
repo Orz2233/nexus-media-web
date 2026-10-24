@@ -859,8 +859,8 @@ async function handleResultSubscribe(item: SearchResult) {
   }
   const code = item.title;
   const preferredProvider =
-    getContentProfileDefaultSearchSource(item.content_profile) ||
     item.provider ||
+    getContentProfileDefaultSearchSource(item.content_profile) ||
     metadataSource.value ||
     '';
   let metadataRef = item.metadata_ref;
@@ -885,7 +885,7 @@ async function handleResultSubscribe(item: SearchResult) {
     }
     await addSubscriptionMediaApi({
       content_profile: item.content_profile,
-      mediaid: `content_id:${code}`,
+      mediaid: `${preferredProvider || item.content_profile}:${code}`,
       metadata_policy: `provider_only:${item.content_profile}`,
       metadata_ref: metadataRef,
       name: metadataTitle,
