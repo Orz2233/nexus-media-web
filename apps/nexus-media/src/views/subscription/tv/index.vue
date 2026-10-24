@@ -91,7 +91,13 @@ interface SubscriptionGroup {
 }
 
 function groupKey(item: any): string {
-  const media = item.tmdbid ? `tmdb:${item.tmdbid}` : `name:${item.name}`;
+  const media = item.identity_id
+    ? `id:${item.identity_id}`
+    : item.anchor_provider && item.anchor_external_id
+      ? `${item.anchor_provider}:${item.anchor_external_id}`
+      : item.tmdbid
+        ? `tmdb:${item.tmdbid}`
+        : `name:${item.name}`;
   return `${media}:${item.season || ''}`;
 }
 

@@ -66,9 +66,14 @@ interface SubscriptionGroup {
 const subscriptionGroups = computed<SubscriptionGroup[]>(() => {
   const map = new Map<string, SubscriptionGroup>();
   for (const item of subscriptionStore.movieSubscriptions) {
-    const key = item.tmdbid
-      ? `tmdb:${item.tmdbid}`
-      : `name:${item.name}:${item.year || ''}`;
+    const identity = item.identity_id
+      ? `id:${item.identity_id}`
+      : item.anchor_provider && item.anchor_external_id
+        ? `${item.anchor_provider}:${item.anchor_external_id}`
+        : item.tmdbid
+          ? `tmdb:${item.tmdbid}`
+          : `name:${item.name}:${item.year || ''}`;
+    const key = identity;
     const group = map.get(key);
     if (group) {
       group.items.push(item);

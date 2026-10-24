@@ -24,6 +24,13 @@ export namespace SubscriptionApi {
     image?: string;
     year?: string;
     tmdbid?: string;
+    identity_id?: string;
+    anchor_provider?: string;
+    anchor_external_id?: string;
+    content_profile?: string;
+    metadata_policy?: string;
+    naming_profile?: string;
+    source_label?: string;
     state?: string;
     season?: string;
     total?: number;
