@@ -44,7 +44,7 @@ import { IconifyIcon } from '@vben/icons';
 
 import * as NaiveUI from 'naive-ui';
 
-import { message, modal } from '#/adapter/naive';
+import { dialog, message, modal } from '#/adapter/naive';
 import { requestClient } from '#/api/request';
 import EmptyState from '#/components/empty/EmptyState.vue';
 import PathPickerModal from '#/components/media/PathPickerModal.vue';
@@ -104,6 +104,7 @@ const host = {
   SubscribeEditModal,
   SubscriptionGroupCard,
   SubscriptionHoverCard,
+  dialog,
   message,
   modal,
   getContentProfileDefaultSearchSource,
