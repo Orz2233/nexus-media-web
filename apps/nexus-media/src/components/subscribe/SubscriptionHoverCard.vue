@@ -463,8 +463,8 @@ onMounted(ensureOutsideListener);
 
         <!-- 站点：显示名称，过多可折叠 -->
         <div v-if="hasSites" class="shc-section">
-          <div v-if="rssSites.length > 0" class="shc-site-row">
-            <span class="shc-site-label">订阅站点</span>
+          <div v-if="rssSites.length > 0" class="shc-setting-row">
+            <span class="shc-setting-label">订阅站点</span>
             <div class="shc-site-tags">
               <NTag
                 v-for="s in rssVisible"
@@ -485,8 +485,8 @@ onMounted(ensureOutsideListener);
               </NTag>
             </div>
           </div>
-          <div v-if="searchSites.length > 0" class="shc-site-row">
-            <span class="shc-site-label">搜索站点</span>
+          <div v-if="searchSites.length > 0" class="shc-setting-row">
+            <span class="shc-setting-label">搜索站点</span>
             <div class="shc-site-tags">
               <NTag
                 v-for="s in searchVisible"
