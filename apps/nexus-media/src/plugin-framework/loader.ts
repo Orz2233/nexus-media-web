@@ -104,6 +104,9 @@ const host = {
   SubscriptionHoverCard,
   message,
   modal,
+  getContentProfileDefaultSearchSource,
+  getContentProfileDefaultDetailSource,
+  refreshContentProfiles: refreshPluginContentProfiles,
   api: requestClient,
 };
 
@@ -143,7 +146,9 @@ const contentProfiles = reactive<
   Record<
     string,
     {
+      defaultDetailSource: string;
       defaultSearchSource: string;
+      overviewFallback: string;
       detailPath: string;
       label: string;
       presentationType: string;
@@ -209,6 +214,18 @@ export function getContentProfileDefaultSearchSource(
   return contentProfiles[key]?.defaultSearchSource || '';
 }
 
+export function getContentProfileOverviewFallback(key?: null | string): string {
+  if (!key) return '';
+  return contentProfiles[key]?.overviewFallback || '';
+}
+
+export function getContentProfileDefaultDetailSource(
+  key?: null | string,
+): string {
+  if (!key) return '';
+  return contentProfiles[key]?.defaultDetailSource || '';
+}
+
 export function getContentProfileOptions(): Array<{
   label: string;
   value: string;
@@ -223,6 +240,8 @@ function registerContentProfiles(plugin: PluginManifestFrontend) {
   for (const profile of plugin.frontend.content_profiles || []) {
     if (!profile.key) continue;
     contentProfiles[profile.key] = {
+      defaultDetailSource: profile.default_detail_source || '',
+      overviewFallback: profile.overview_fallback || '',
       defaultSearchSource:
         profile.default_search_source ||
         profile.search_sources?.[0]?.value ||
@@ -253,7 +272,9 @@ export interface PluginManifestFrontend {
       /** @deprecated 旧 manifest 字段，读取时兼容 */
       media_type?: string;
       detail_path?: string;
+      default_detail_source?: string;
       default_search_source?: string;
+      overview_fallback?: string;
       search_sources?: Array<{ label: string; value: string }>;
     }>;
     routes: Array<{
@@ -541,6 +562,20 @@ export async function loadAllPluginFrontends(): Promise<void> {
     _pluginsLoaded = true;
   } catch (error) {
     console.error('[PluginLoader] 获取插件列表失败:', error);
+  }
+}
+
+/** 重新拉取启用插件的 content profile，应用最新默认值 */
+export async function refreshPluginContentProfiles(): Promise<void> {
+  try {
+    const plugins: PluginManifestFrontend[] = await requestClient.get(
+      `${PLUGIN_API_BASE}/plugins`,
+    );
+    for (const plugin of plugins) {
+      if (plugin.enabled) registerContentProfiles(plugin);
+    }
+  } catch (error) {
+    console.error('[PluginLoader] 刷新内容画像默认值失败:', error);
   }
 }
 

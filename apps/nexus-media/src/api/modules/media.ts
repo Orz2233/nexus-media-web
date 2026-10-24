@@ -66,6 +66,13 @@ export async function searchMetadataApi(params: {
   );
 }
 
+/** 获取可搜索的元数据来源（动态） */
+export async function getMetadataProvidersApi() {
+  return requestClient.get<Record<string, any>[]>(
+    '/media/providers?include_health=false',
+  );
+}
+
 /** 获取媒体详情 */
 export async function getMediaDetailApi(tmdbid: number | string, type: string) {
   return requestClient.post<MediaApi.MediaDetail>('/media/detail', {

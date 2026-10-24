@@ -22,6 +22,7 @@ import {
 } from 'naive-ui';
 
 import {
+  getMetadataProvidersApi,
   getSearchResultApi,
   searchMediaApi,
   searchMetadataApi,
@@ -50,6 +51,7 @@ import {
   getContentProfileDefaultSearchSource,
   getContentProfileDetailPath,
   getContentProfileLabel,
+  getContentProfileOverviewFallback,
   getContentProfilePosterPosition,
   getContentProfileSearchSources,
   getContentProfileSourceOptions,
@@ -597,21 +599,47 @@ function resumeOngoingSearch(): boolean {
   return true;
 }
 
-const baseTypeOptions = [
-  { label: '全部来源', value: '' },
-  { label: 'TMDB', value: 'tmdb' },
-  { label: '豆瓣', value: 'douban' },
-];
+const metadataProviders = ref<
+  Array<{ label: string; profile: string; value: string }>
+>([]);
+const baseTypeOptions = computed(() => [
+  { label: '全部来源', profile: '', value: '' },
+  ...metadataProviders.value,
+]);
 const pluginSourceOptions = computed(() => getContentProfileSourceOptions());
 const sourceProfileMap = computed(() =>
   Object.fromEntries(
-    pluginSourceOptions.value.map((item) => [item.value, item.profile]),
+    [...baseTypeOptions.value, ...pluginSourceOptions.value].map((item) => [
+      item.value,
+      item.profile,
+    ]),
   ),
 );
 const typeOptions = computed(() => [
-  ...baseTypeOptions,
+  ...baseTypeOptions.value,
   ...pluginSourceOptions.value,
 ]);
+
+async function loadMetadataProviders() {
+  try {
+    const res: any = await getMetadataProvidersApi();
+    const list = Array.isArray(res) ? res : res?.data || [];
+    metadataProviders.value = list
+      .filter(
+        (item: any) =>
+          item?.visibility === 'public' &&
+          Array.isArray(item?.capabilities) &&
+          item.capabilities.includes('search'),
+      )
+      .map((item: any) => ({
+        label: String(item.name || item.provider),
+        profile: String(item.content_profiles?.[0] || ''),
+        value: String(item.provider),
+      }));
+  } catch {
+    metadataProviders.value = [];
+  }
+}
 
 function metadataContentId(item: any): string {
   const extra = item?.extra || {};
@@ -893,14 +921,16 @@ async function handleAdvancedSearch() {
 }
 
 function withRoutePoster(item: any) {
+  const profile = String(
+    item.content_profile || route.query.content_profile || '',
+  ).trim();
   const raw = String(route.query.poster || '').trim();
-  if (!raw) return item;
+  if (!raw) return { ...item, content_profile: profile };
   const poster = raw.startsWith('/img')
     ? raw
     : `/img?url=${encodeURIComponent(raw)}`;
   const vote = String(route.query.vote || '').trim();
   const year = String(route.query.year || '').trim();
-  const profile = String(route.query.content_profile || '').trim();
   const itemVote = String(item.vote || '').trim();
   const hasVote = itemVote && itemVote !== '0' && itemVote !== '0.0';
   const base = {
@@ -910,7 +940,7 @@ function withRoutePoster(item: any) {
     poster: item.poster || poster,
     vote: hasVote ? item.vote : vote,
     year: item.year || year,
-    content_profile: item.content_profile || profile,
+    content_profile: profile,
     metadata_ref: String(route.query.metadata_ref || ''),
     provider: String(route.query.metadata_source || ''),
   };
@@ -925,6 +955,71 @@ function withRoutePoster(item: any) {
     type: 'movie',
     type_key: 'movie',
   };
+}
+
+const overviewTitleCache = new Map<string, string>();
+
+async function fillResultOverviews(items: any[]) {
+  const groups = new Map<
+    string,
+    { code: string; items: any[]; profile: string }
+  >();
+  for (const item of items) {
+    if (String(item.overview || '').trim()) continue;
+    const profile = String(
+      item.content_profile || contentProfileKey.value || '',
+    );
+    if (getContentProfileOverviewFallback(profile) !== 'title') continue;
+    const code = String(item.title || '').trim();
+    if (!code) continue;
+    const key = `${profile}:${code}`;
+    const group = groups.get(key) || { code, items: [], profile };
+    group.items.push(item);
+    groups.set(key, group);
+  }
+  await Promise.all(
+    [...groups.entries()].map(async ([key, group]) => {
+      let title = overviewTitleCache.get(key) || '';
+      if (!title) {
+        try {
+          const res: any = await searchMetadataApi({
+            content_profile: group.profile,
+            limit: 10,
+            provider:
+              group.items[0]?.provider ||
+              getContentProfileDefaultSearchSource(group.profile) ||
+              undefined,
+            query: group.code,
+          });
+          const hits = Array.isArray(res) ? res : res?.data || [];
+          const code = group.code.toUpperCase();
+          const hit =
+            hits.find((entry: any) =>
+              String(entry?.title || '')
+                .trim()
+                .toUpperCase()
+                .startsWith(code),
+            ) ||
+            hits.find((entry: any) =>
+              String(entry?.title || '')
+                .toUpperCase()
+                .includes(code),
+            );
+          title = String(hit?.title || '').trim();
+          if (title) overviewTitleCache.set(key, title);
+        } catch {
+          title = '';
+        }
+      }
+      if (title) {
+        for (const item of group.items) item.overview = title;
+      }
+    }),
+  );
+}
+
+function resultOverview(item: any): string {
+  return String(item.overview || '').trim() || '暂无简介';
 }
 
 async function loadSearchResults() {
@@ -983,6 +1078,7 @@ async function loadSearchResults() {
           };
         })
         .map(withRoutePoster);
+      void fillResultOverviews(results.value);
       // 卡片搜索是按条目搜索：只保留卡片对应年份，避免 studio 搜索带出其他年份
       const targetYear = String(route.query.year || '').trim();
       if (route.query.from === 'subscription' && targetYear) {
@@ -1013,6 +1109,7 @@ function handleKeydown(e: KeyboardEvent) {
 let lastHandledQueryKey = '';
 
 onMounted(() => {
+  void loadMetadataProviders();
   loadVisibleSites();
   startSSE();
   // 有进行中的搜索（页面切回）→ 恢复 SSE 连接和进度
@@ -1877,7 +1974,7 @@ async function confirmDownload() {
                     {{ item.fav === '1' ? '已订阅' : '订阅' }}
                   </span>
                 </div>
-                <p class="result-overview">{{ item.overview || '暂无简介' }}</p>
+                <p class="result-overview">{{ resultOverview(item) }}</p>
                 <div class="result-stats">
                   <div class="result-stat">
                     <div class="stat-num">{{ totalTorrentCount(item) }}</div>
