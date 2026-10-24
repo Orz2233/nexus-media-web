@@ -92,6 +92,16 @@ export async function getSubscriptionCalendarWebcalUrlApi() {
   );
 }
 
+/** 获取订阅总数（全部内容画像） */
+export async function getSubscriptionCountApi() {
+  return requestClient.post<{
+    movie: number;
+    new_today: number;
+    total: number;
+    tv: number;
+  }>('/subscription/count', {});
+}
+
 /** 获取电影订阅（superadmin 可传 userId 过滤指定用户） */
 export async function getMovieSubscriptionApi(userId?: number) {
   return requestClient.post<SubscriptionApi.Subscription[]>(
