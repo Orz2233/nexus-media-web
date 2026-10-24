@@ -1019,33 +1019,29 @@ onMounted(ensureOutsideListener);
   border-radius: 9999px;
 }
 
-.shc-keyword {
-  display: inline-flex;
-  gap: 0.35rem;
-  align-items: center;
-  align-self: flex-start;
-  max-width: 100%;
-  padding: 0.18rem 0.45rem;
-  margin-bottom: 0.55rem;
-  overflow: hidden;
-  font-size: 11px;
-  line-height: 1.5;
-  white-space: nowrap;
-  background: hsl(var(--muted) / 28%);
-  border: 1px solid hsl(var(--border) / 70%);
-  border-radius: 0.375rem;
+.shc-setting-row {
+  display: grid;
+  grid-template-columns: 3.9rem minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: start;
+  margin-top: 0.35rem;
 }
 
-.shc-keyword-label {
-  flex-shrink: 0;
-  font-weight: 500;
+.shc-setting-label {
+  padding-top: 1px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
   color: hsl(var(--foreground) / 45%);
 }
 
-.shc-keyword-value {
+.shc-setting-value {
   overflow: hidden;
   text-overflow: ellipsis;
-  color: hsl(var(--card-foreground) / 75%);
+  font-size: 11px;
+  line-height: 18px;
+  color: hsl(var(--card-foreground) / 78%);
+  white-space: nowrap;
 }
 
 :deep(.tag-rss-site) {
