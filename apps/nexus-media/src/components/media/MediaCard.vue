@@ -211,6 +211,7 @@ async function handleConfirmSubscribe(payload: {
             payload.policy === 'auto' ? undefined : payload.policy,
           metadata_ref: it.metadata_ref,
           content_profile: it.content_profile,
+          image: it.image || props.poster || posterUrl.value,
         });
       }
       for (const season of remove) {
@@ -239,6 +240,7 @@ async function handleConfirmSubscribe(payload: {
         metadata_ref: it.metadata_ref,
         content_profile: it.content_profile,
         metadata_policy: payload.policy === 'auto' ? undefined : payload.policy,
+        image: it.image || props.poster || posterUrl.value,
       });
       _fav.value = '1';
       if (res?.rssid) _rssid.value = String(res.rssid);

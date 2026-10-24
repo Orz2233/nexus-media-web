@@ -216,6 +216,7 @@ export async function addSubscriptionMediaApi(data: {
   metadata_policy?: string;
   content_profile?: string;
   naming_profile?: string;
+  image?: string;
 }) {
   return requestClient.post('/subscription/add', data);
 }
