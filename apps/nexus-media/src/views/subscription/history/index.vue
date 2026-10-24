@@ -84,7 +84,7 @@ const activeTab = computed<HistoryTab>(
 );
 const filterType = computed(() => activeTab.value.type);
 const filterProfile = computed(() => activeTab.value.profile);
-const pageTitle = computed(() => `${activeTab.value.label}订阅历史`);
+const pageTitle = '订阅历史';
 const backPath = computed(() => {
   if (activeTab.value.profile !== 'default') {
     return (
