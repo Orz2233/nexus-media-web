@@ -404,15 +404,14 @@ onMounted(ensureOutsideListener);
         <!-- 简介 -->
         <p v-if="overviewText" class="shc-overview">{{ overviewText }}</p>
 
-        <!-- 关键词 -->
-        <div v-if="keyword" class="shc-keyword" :title="keyword">
-          <span class="shc-keyword-label">关键词</span>
-          <span class="shc-keyword-value">{{ keyword }}</span>
+        <!-- 关键词 / 过滤设置 -->
+        <div v-if="keyword" class="shc-setting-row">
+          <span class="shc-setting-label">关键词</span>
+          <span class="shc-setting-value" :title="keyword">{{ keyword }}</span>
         </div>
 
-        <!-- 过滤设置 -->
-        <div v-if="hasFilterInfo" class="shc-section">
-          <div class="shc-section-label">过滤设置</div>
+        <div v-if="hasFilterInfo" class="shc-setting-row">
+          <span class="shc-setting-label">过滤设置</span>
           <div class="shc-tags">
             <NTag v-if="ruleLabel" size="tiny" class="tag-rule">
               {{ ruleLabel }}
