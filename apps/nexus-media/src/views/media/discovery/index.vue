@@ -169,11 +169,16 @@ function applyPreset() {
   activeFeed.value = feed?.key || '';
 }
 
+let loadSeq = 0;
+
 async function loadItems(reset = false) {
   if (!activeProvider.value || !activeFeed.value) return;
-  if (loading.value || loadingMore.value) return;
+  if (!reset && (loading.value || loadingMore.value)) return;
   if (!reset && !hasMore.value) return;
 
+  const seq = ++loadSeq;
+  const provider = activeProvider.value;
+  const feed = activeFeed.value;
   if (reset) {
     page.value = 1;
     items.value = [];
@@ -186,8 +191,8 @@ async function loadItems(reset = false) {
   try {
     const result = unwrap<DiscoveryApi.Page>(
       await getDiscoveryItemsApi({
-        provider: activeProvider.value,
-        feed: activeFeed.value,
+        provider,
+        feed,
         page: page.value,
         filters: {
           ...(supportsSeason.value ? { season: selectedSeason.value } : {}),
@@ -197,6 +202,7 @@ async function loadItems(reset = false) {
         },
       }),
     );
+    if (seq !== loadSeq) return;
     const list = result?.items || [];
     const merged = reset ? list : [...items.value, ...list];
     const seen = new Set<string>();
@@ -208,8 +214,10 @@ async function loadItems(reset = false) {
     });
     hasMore.value = Boolean(result?.has_more);
   } finally {
-    loading.value = false;
-    loadingMore.value = false;
+    if (seq === loadSeq) {
+      loading.value = false;
+      loadingMore.value = false;
+    }
   }
 }
 
