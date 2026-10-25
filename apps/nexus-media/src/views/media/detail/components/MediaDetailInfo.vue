@@ -8,7 +8,13 @@ import { NButton, NTag } from 'naive-ui';
 import CastList from './CastList.vue';
 import FactPanel from './FactPanel.vue';
 
+interface ActorProfile {
+  image_url?: string;
+  name: string;
+}
+
 interface Props {
+  actorProfiles?: ActorProfile[];
   actors?: string[];
   detail: Record<string, any>;
   genres?: string[];
@@ -16,7 +22,13 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   actors: () => [],
+  actorProfiles: () => [],
   genres: () => [],
+});
+
+const displayActors = computed<ActorProfile[]>(() => {
+  if (props.actorProfiles.length > 0) return props.actorProfiles;
+  return props.actors.map((name) => ({ name }));
 });
 
 const overviewExpanded = ref(false);
@@ -93,9 +105,42 @@ const overviewStyle = computed(() =>
           </div>
         </div>
         <div class="flex flex-wrap gap-2">
-          <NTag v-for="name in actors" :key="name" size="small">
-            {{ name }}
-          </NTag>
+          <div
+            v-for="actor in displayActors"
+            :key="actor.name"
+            class="flex min-w-0 items-center gap-2 rounded-full border py-1 pr-3 pl-1"
+            style="
+              background: hsl(var(--card));
+              border-color: hsl(var(--border));
+            "
+          >
+            <img
+              v-if="actor.image_url"
+              :src="actor.image_url"
+              :alt="actor.name"
+              class="size-9 shrink-0 rounded-full object-cover"
+              loading="lazy"
+            />
+            <div
+              v-else
+              class="flex size-9 shrink-0 items-center justify-center rounded-full"
+              style="background: hsl(var(--muted))"
+              aria-hidden="true"
+            >
+              <IconifyIcon
+                icon="lucide:user"
+                class="size-4"
+                style="color: hsl(var(--muted-foreground))"
+              />
+            </div>
+            <span
+              class="truncate text-sm"
+              style="color: hsl(var(--card-foreground))"
+              :title="actor.name"
+            >
+              {{ actor.name }}
+            </span>
+          </div>
         </div>
       </div>
       <div v-if="genres.length > 0">
