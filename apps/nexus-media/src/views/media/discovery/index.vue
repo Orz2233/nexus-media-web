@@ -8,7 +8,11 @@ import { IconifyIcon } from '@vben/icons';
 
 import { NButton, NSpin } from 'naive-ui';
 
-import { getDiscoveryItemsApi, getDiscoveryProvidersApi } from '#/api';
+import {
+  getDiscoveryItemsApi,
+  getDiscoveryProvidersApi,
+  getMediaDetailByRefApi,
+} from '#/api/modules/media';
 import {
   getMovieSubscriptionApi,
   getTvSubscriptionApi,
@@ -35,6 +39,10 @@ const hasMore = ref(false);
 const loading = ref(false);
 const loadingMore = ref(false);
 const loadingSources = ref(true);
+const loadError = ref<null | { message: string; retryable: boolean }>(null);
+const prefetchedDetails = new Set<string>();
+let prefetching = false;
+const prefetchQueue: DiscoveryApi.Item[] = [];
 const selectedSeasonQuarter = ref(currentSeason().split('-q')[1]);
 const selectedYear = ref(String(new Date().getFullYear()));
 const selectedSeason = computed(
@@ -222,6 +230,7 @@ async function loadItems(reset = false) {
     items.value = [];
     hasMore.value = true;
     loading.value = true;
+    loadError.value = null;
   } else {
     loadingMore.value = true;
   }
@@ -250,6 +259,15 @@ async function loadItems(reset = false) {
       ),
     );
     if (seq !== loadSeq) return;
+    if (result?.error) {
+      loadError.value = {
+        message: result.error,
+        retryable: result.retryable !== false,
+      };
+      hasMore.value = false;
+      return;
+    }
+    loadError.value = null;
     if (supportsGenre.value) {
       // 题材是 feed 级目录：只在首次加载/切换 feed 时刷新，避免翻页或筛选后被当前页结果改写。
       const feedKey = `${provider}:${feed}`;
@@ -287,9 +305,11 @@ async function loadItems(reset = false) {
       return true;
     });
     hasMore.value = Boolean(result?.has_more);
+    if (reset) scheduleDetailPrefetch(items.value);
   } catch {
     // 超时/失败时停止无限滚动，避免底部一直显示加载中。
     if (seq === loadSeq) {
+      loadError.value = { message: '加载失败，请稍后重试', retryable: true };
       hasMore.value = false;
     }
   } finally {
@@ -297,6 +317,60 @@ async function loadItems(reset = false) {
       loading.value = false;
       loadingMore.value = false;
     }
+  }
+}
+
+function scheduleDetailPrefetch(list: DiscoveryApi.Item[]) {
+  if (!list.length || typeof window === 'undefined') return;
+  for (const item of list.slice(0, 4)) {
+    if (
+      !item.actions?.includes('detail') ||
+      !item.ref?.provider ||
+      !item.ref.external_id
+    ) {
+      continue;
+    }
+    const key = `${item.ref.provider}:${item.ref.external_id}`;
+    if (prefetchedDetails.has(key)) continue;
+    prefetchedDetails.add(key);
+    prefetchQueue.push(item);
+  }
+  if (!prefetchQueue.length || prefetching) return;
+  const run = () => void runPrefetchQueue();
+  const idle = (window as any).requestIdleCallback;
+  if (typeof idle === 'function') idle(run, { timeout: 2000 });
+  else setTimeout(run, 800);
+}
+
+async function runPrefetchQueue() {
+  if (prefetching) return;
+  prefetching = true;
+  try {
+    while (prefetchQueue.length) {
+      const item = prefetchQueue.shift();
+      if (!item) continue;
+      try {
+        await getMediaDetailByRefApi(
+          item.ref.provider,
+          item.ref.external_id,
+          itemType(item),
+        );
+      } catch {
+        // 预取失败不打扰用户，详情页会正常重试。
+      }
+    }
+  } finally {
+    prefetching = false;
+  }
+}
+
+function retryLoad() {
+  loadError.value = null;
+  if (!items.value.length) {
+    page.value = 1;
+    loadItems(true);
+  } else {
+    loadItems(false);
   }
 }
 
@@ -311,6 +385,7 @@ function beginTabSwitch() {
   selectedGenre.value = '';
   genreOptions.value = [];
   genreOptionsFeed.value = '';
+  loadError.value = null;
 }
 
 async function selectProvider(provider: string) {
@@ -851,6 +926,22 @@ onUnmounted(() => {
           />
         </div>
         <EmptyState
+          v-else-if="!loading && loadError"
+          title="加载失败"
+          :subtitle="loadError.message"
+        >
+          <template #action>
+            <NButton
+              v-if="loadError.retryable"
+              size="small"
+              type="primary"
+              @click="retryLoad"
+            >
+              重试
+            </NButton>
+          </template>
+        </EmptyState>
+        <EmptyState
           v-else-if="!loading"
           title="没有找到内容"
           subtitle="切换来源、榜单或筛选条件后再试"
@@ -872,6 +963,22 @@ onUnmounted(() => {
         <span v-else class="text-xs text-muted-foreground">
           已加载 {{ items.length }} 条，继续滚动加载
         </span>
+      </div>
+      <div
+        v-else-if="loadError && items.length > 0"
+        class="flex flex-col items-center justify-center gap-2 mt-6"
+      >
+        <span class="text-sm text-muted-foreground">{{
+          loadError.message
+        }}</span>
+        <NButton
+          v-if="loadError.retryable"
+          size="small"
+          type="primary"
+          @click="retryLoad"
+        >
+          重试
+        </NButton>
       </div>
       <div
         v-else-if="items.length > 0"
