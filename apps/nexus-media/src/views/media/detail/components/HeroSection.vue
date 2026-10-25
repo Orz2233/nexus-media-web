@@ -212,10 +212,10 @@ function imageUrl(url?: any) {
             v-if="contentCode"
             size="small"
             :bordered="false"
-            class="font-mono tracking-wide"
+            class="font-mono font-medium tracking-wide"
             style="
-              color: hsl(var(--muted-foreground));
-              background: hsl(var(--muted));
+              color: hsl(var(--tag-primary));
+              background: hsl(var(--tag-primary) / 12%);
             "
           >
             {{ contentCode }}
