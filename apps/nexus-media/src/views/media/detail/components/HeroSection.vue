@@ -47,6 +47,27 @@ watch(
   { immediate: true },
 );
 
+const contentCode = computed(() =>
+  String(
+    props.detail.id ||
+      props.detail.mediaid ||
+      props.detail.anchor_external_id ||
+      '',
+  ).trim(),
+);
+
+const displayTitle = computed(() => {
+  const title = String(props.detail.title || '').trim();
+  const code = contentCode.value;
+  if (code && title.toLowerCase().startsWith(code.toLowerCase())) {
+    return title
+      .slice(code.length)
+      .replace(/^[\s:：\-–—]+/, '')
+      .trim();
+  }
+  return title;
+});
+
 const tmdbUrl = computed(() => {
   const tid = props.detail.tmdbid;
   if (!tid) return '';
@@ -189,9 +210,24 @@ function imageUrl(url?: any) {
           </NTag>
         </div>
 
+        <div v-if="contentCode" class="mb-2">
+          <NTag
+            size="small"
+            :bordered="false"
+            class="font-mono tracking-wide"
+            style="
+              color: hsl(var(--muted-foreground));
+              background: hsl(var(--muted));
+            "
+          >
+            {{ contentCode }}
+          </NTag>
+        </div>
+
         <h1
-          class="mb-2 text-2xl font-bold sm:text-3xl md:text-4xl"
+          class="mb-2 line-clamp-3 text-2xl font-bold sm:text-3xl md:text-4xl"
           style="color: hsl(var(--card-foreground))"
+          :title="displayTitle"
         >
           <a
             v-if="detailUrl"
@@ -200,9 +236,9 @@ function imageUrl(url?: any) {
             rel="noopener"
             class="hover:underline"
           >
-            {{ detail.title }}
+            {{ displayTitle }}
           </a>
-          <template v-else>{{ detail.title }}</template>
+          <template v-else>{{ displayTitle }}</template>
           <span
             v-if="detail.year"
             class="text-lg font-normal opacity-70 sm:text-xl md:text-2xl"
