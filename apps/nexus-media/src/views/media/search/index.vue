@@ -217,11 +217,16 @@ async function handleSubscribe(item: SearchResult, e: Event) {
   subscribeConfirmItem.value = {
     id: String(item.tmdbid || item.key),
     tmdbid: item.tmdbid,
+    mediaid: (item as any).metadata_ref || String(item.tmdbid || item.key),
     title: item.title,
     year: item.year || '',
     type: mtype,
     image: item.poster,
     overview: item.overview,
+    content_profile: (item as any).content_profile,
+    metadata_ref: (item as any).metadata_ref,
+    anchor_provider: (item as any).anchor_provider,
+    anchor_external_id: (item as any).anchor_external_id,
   };
   subscribeConfirmShow.value = true;
 }
@@ -245,8 +250,11 @@ async function handleConfirmSubscribe(payload: {
           name: it.title,
           year: it.year || '',
           type: 'tv',
-          mediaid: String(it.id),
+          mediaid: it.mediaid || String(it.id),
           season: String(season),
+          content_profile: it.content_profile,
+          metadata_ref: it.metadata_ref,
+          provider: it.provider,
         });
         lastRssid = r?.rssid ? String(r.rssid) : lastRssid;
       }
@@ -257,6 +265,7 @@ async function handleConfirmSubscribe(payload: {
           type: 'tv',
           tmdbid: String(it.tmdbid || it.id),
           season: String(season),
+          content_profile: it.content_profile,
         });
       }
       const fav = selected.length > 0 ? '1' : '';
@@ -273,7 +282,12 @@ async function handleConfirmSubscribe(payload: {
         name: it.title,
         year: it.year || '',
         type: typeParam,
-        mediaid: String(it.id),
+        mediaid: it.mediaid || String(it.id),
+        content_profile: it.content_profile,
+        metadata_ref: it.metadata_ref,
+        provider: it.provider,
+        anchor_provider: it.anchor_provider,
+        anchor_external_id: it.anchor_external_id,
       });
       const success = res?.code === 0 || res?.success || res?.rssid || !res;
       if (success) {
@@ -308,7 +322,10 @@ async function handleEditSubscribe() {
   const mtype = it.type === 'movie' ? 'movie' : 'tv';
   let defaults: any = {};
   try {
-    const res: any = await getDefaultSubscriptionSettingApi(mtype);
+    const res: any = await getDefaultSubscriptionSettingApi(
+      mtype,
+      it.content_profile,
+    );
     defaults = res?.data || res || {};
   } catch {
     // ignore
@@ -319,6 +336,9 @@ async function handleEditSubscribe() {
     type: mtype,
     tmdbid: String(it.tmdbid || it.id || ''),
     image: it.image,
+    content_profile: it.content_profile,
+    metadata_ref: it.metadata_ref,
+    mediaid: it.mediaid,
     season: '',
     fuzzy_match: false,
     over_edition: !!(
@@ -349,7 +369,11 @@ async function handleEditSubscribe() {
 
 async function handleConfirmEdit(data: Record<string, any>) {
   try {
-    const res: any = await addSubscriptionApi(data);
+    const isCustom =
+      !!data.content_profile && data.content_profile !== 'default';
+    const res: any = isCustom
+      ? await addSubscriptionMediaApi(data)
+      : await addSubscriptionApi(data);
     const it = subscribeConfirmItem.value;
     if (it) {
       updateCardSubscribeState(
@@ -390,11 +414,14 @@ function handleMediaSubscribe(media: MediaItem) {
   subscribeConfirmItem.value = {
     id: String(media.tmdb_id || media.id),
     tmdbid: String(media.tmdb_id || media.id),
+    mediaid: (media as any).metadata_ref || String(media.tmdb_id || media.id),
     title: media.title,
     year: media.year || '',
     type: normalizeMediaType(media.media_type || media.type),
     image: media.image || media.poster,
     overview: media.overview,
+    content_profile: (media as any).content_profile,
+    metadata_ref: (media as any).metadata_ref,
   };
   subscribeConfirmShow.value = true;
 }
@@ -466,6 +493,7 @@ interface MediaItem {
   provider?: string;
   anchor_provider?: string;
   anchor_external_id?: string;
+  search_query?: string;
   studio?: string;
   vote?: number | string;
   image?: string;
@@ -665,7 +693,19 @@ function mapMetadataResults(list: any[]): MediaItem[] {
   const routeVote = String(route.query.vote || '');
   const routeYear = String(route.query.year || '');
   return list.map((item) => {
+    const extra = item.extra || {};
+    const profile = item.content_profile || 'default';
     const contentId = metadataContentId(item);
+    const searchQuery = String(
+      extra.search_query || contentId || item.title || '',
+    );
+    const anchorProvider = String(
+      extra.anchor_provider || item.ref?.provider || 'content_id',
+    );
+    const anchorExternalId = String(
+      extra.anchor_external_id || item.ref?.external_id || contentId || '',
+    );
+    const studio = String(extra.studio || extra[`${profile}.studio`] || '');
     const isKeywordHit =
       String(item.title || '').toUpperCase() ===
         keyword.value.trim().toUpperCase() ||
@@ -682,9 +722,10 @@ function mapMetadataResults(list: any[]): MediaItem[] {
       overview: item.overview || '',
       poster: (isKeywordHit ? routePoster : '') || item.poster || '',
       provider: item.ref?.provider || '',
-      anchor_provider: item.ref?.provider || '',
-      anchor_external_id: item.ref?.external_id || '',
-      studio: String(item.extra?.['adult.studio'] || ''),
+      anchor_provider: anchorProvider,
+      anchor_external_id: anchorExternalId,
+      search_query: searchQuery,
+      studio,
       title: item.title || String(contentId || ''),
       tmdb_id: '',
       type: item.media_type || 'movie',
@@ -784,19 +825,15 @@ function handleMediaCardClick(media: MediaItem) {
 /** 点击「搜索资源」→ 触发种子搜索 */
 async function handleMediaSearch(media: MediaItem) {
   if (media.content_profile && media.content_profile !== 'default') {
-    const isThePornDb = media.provider === 'theporndb';
-    const studio = String(media.studio || '').replace(/\.(com|net|org)$/i, '');
-    const code = isThePornDb
-      ? studio || String(media.title || media.id || '')
-      : String(media.id || media.title || '');
+    const code = String(media.search_query || media.id || media.title || '');
     const query: Record<string, string> = {
       s: code,
       from: 'subscription',
       media_type: 'movie',
       content_profile: media.content_profile,
       metadata_source: media.provider || metadataSource.value,
-      anchor_provider: isThePornDb ? 'theporndb' : 'content_id',
-      anchor_external_id: isThePornDb ? String(media.id || '') : code,
+      anchor_provider: media.anchor_provider || 'content_id',
+      anchor_external_id: media.anchor_external_id || code,
     };
     if (media.poster) query.poster = media.poster;
     if (media.vote) query.vote = String(media.vote);
@@ -874,26 +911,33 @@ async function handleResultSubscribe(item: SearchResult) {
         query: code,
       });
       const list = Array.isArray(res) ? res : res?.data || [];
-      const hit = list.find((entry: any) => entry?.ref?.external_id);
-      if (hit?.ref) {
-        metadataRef = `${hit.ref.provider}:${hit.ref.external_id}`;
+      const hit = list.find(
+        (entry: any) => entry?.ref?.external_id || entry?.external_id,
+      );
+      if (hit) {
+        const provider = hit.ref?.provider || hit.provider || preferredProvider;
+        const externalId = String(
+          hit.ref?.external_id || hit.external_id || '',
+        );
+        metadataRef = `${provider}:${externalId}`;
         metadataTitle = hit.title || metadataTitle;
       }
     }
-    if (!metadataRef || metadataRef.startsWith('tmdb:')) {
-      metadataRef = `${preferredProvider || item.content_profile || 'content_id'}:${code}`;
-    }
-    await addSubscriptionMediaApi({
-      content_profile: item.content_profile,
-      mediaid: `${preferredProvider || item.content_profile}:${code}`,
-      metadata_policy: `provider_only:${item.content_profile}`,
-      metadata_ref: metadataRef,
-      name: metadataTitle,
-      type: 'movie',
+    subscribeConfirmItem.value = {
+      id: code,
+      mediaid: `content_id:${code}`,
+      title: metadataTitle,
       year: item.year || '',
-    });
-    item.fav = '1';
-    notification.success('订阅成功', { description: code });
+      type: 'movie',
+      image: item.poster,
+      overview: item.overview,
+      content_profile: item.content_profile,
+      metadata_ref: metadataRef,
+      provider: preferredProvider,
+      anchor_provider: 'content_id',
+      anchor_external_id: code,
+    };
+    subscribeConfirmShow.value = true;
   } catch (error: any) {
     notification.error('订阅失败', {
       description: error?.message || '未知错误',
