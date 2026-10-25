@@ -469,6 +469,13 @@ const metadataSource = ref(
     getContentProfileDefaultSearchSource(contentProfileKey.value),
 );
 
+watch(profileSources, (sources) => {
+  if (!sources.length) return;
+  if (!sources.some((item) => item.value === metadataSource.value)) {
+    metadataSource.value = sources[0]!.value;
+  }
+});
+
 // 持久化当前搜索关键词，用于从其他页面切回（无 query 参数）时恢复标题显示
 const SEARCH_KEYWORD_KEY = 'nexus:search:keyword';
 function setSearchKeyword(k: string) {

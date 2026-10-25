@@ -114,6 +114,7 @@ const host = {
   getContentProfileImageUrl,
   getContentProfilePosterPosition,
   registerContentProfileImageTransformer,
+  setContentProfileSearchSources,
   useRoute,
   dialog,
   message,
@@ -175,10 +176,35 @@ const contentProfiles = reactive<
   >
 >({});
 /** 插件注册的图片变换（SFW 模糊等），宿主卡片/日历统一调用 */
+const pendingSearchSources = new Map<
+  string,
+  { defaultSource?: string; sources: Array<{ label: string; value: string }> }
+>();
+
 const contentProfileImageTransformers = new Map<
   string,
   (url: string) => string
 >();
+
+export function setContentProfileSearchSources(
+  profile: string,
+  sources: Array<{ label: string; value: string }>,
+  defaultSource?: string,
+): void {
+  if (!profile) return;
+  const normalized = sources.filter((item) => item?.label && item?.value);
+  if (!contentProfiles[profile]) {
+    pendingSearchSources.set(profile, { defaultSource, sources: normalized });
+    return;
+  }
+  contentProfiles[profile].searchSources = normalized;
+  const current = defaultSource || contentProfiles[profile].defaultSearchSource;
+  contentProfiles[profile].defaultSearchSource = normalized.some(
+    (item) => item.value === current,
+  )
+    ? (current ?? '')
+    : (normalized[0]?.value ?? '');
+}
 
 export function registerContentProfileImageTransformer(
   profile: string,
@@ -303,6 +329,15 @@ function registerContentProfiles(plugin: PluginManifestFrontend) {
         ? profile.search_sources.filter((item) => item?.label && item?.value)
         : [],
     };
+    const registered = contentProfiles[profile.key];
+    const pending = pendingSearchSources.get(profile.key);
+    if (registered && pending) {
+      registered.searchSources = pending.sources;
+      if (pending.defaultSource) {
+        registered.defaultSearchSource = pending.defaultSource;
+      }
+      pendingSearchSources.delete(profile.key);
+    }
   }
   pluginProfileKeys.set(plugin.id, keys);
 }
