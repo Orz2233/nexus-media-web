@@ -38,6 +38,7 @@ import {
   watch,
   watchEffect,
 } from 'vue';
+import { useRoute } from 'vue-router';
 
 import { useAppConfig } from '@vben/hooks';
 import { IconifyIcon } from '@vben/icons';
@@ -51,9 +52,12 @@ import PathPickerModal from '#/components/media/PathPickerModal.vue';
 import PageHeader from '#/components/page/PageHeader.vue';
 import SubscribeDefaultSettingModal from '#/components/subscribe/SubscribeDefaultSettingModal.vue';
 import SubscribeEditModal from '#/components/subscribe/SubscribeEditModal.vue';
+import SubscriptionDeleteModal from '#/components/subscribe/SubscriptionDeleteModal.vue';
 import SubscriptionGroupCard from '#/components/subscribe/SubscriptionGroupCard.vue';
 import SubscriptionHoverCard from '#/components/subscribe/SubscriptionHoverCard.vue';
+import SubscriptionListPage from '#/components/subscribe/SubscriptionListPage.vue';
 import { router } from '#/router';
+import { getImgUrl } from '#/utils/image';
 import HeroSection from '#/views/media/detail/components/HeroSection.vue';
 import MediaDetailInfo from '#/views/media/detail/components/MediaDetailInfo.vue';
 import RenameFormatBuilder from '#/views/system/basic/components/RenameFormatBuilder.vue';
@@ -102,8 +106,15 @@ const host = {
   PathPickerModal,
   SubscribeDefaultSettingModal,
   SubscribeEditModal,
+  SubscriptionDeleteModal,
   SubscriptionGroupCard,
   SubscriptionHoverCard,
+  SubscriptionListPage,
+  getImgUrl,
+  getContentProfileImageUrl,
+  getContentProfilePosterPosition,
+  registerContentProfileImageTransformer,
+  useRoute,
   dialog,
   message,
   modal,
@@ -116,6 +127,8 @@ const host = {
 /** 已加载的插件组件映射: pluginId -> { componentName: Component } */
 const loadedModules = new Map<string, Record<string, Component>>();
 const pluginFrontendVersions = new Map<string, string>();
+/** 插件声明的内容画像 key，卸载时一并清理，避免禁用后 tab 残留 */
+const pluginProfileKeys = new Map<string, string[]>();
 
 /** 插槽注册表: slotTarget -> { pluginId, componentName, name, icon, color }[] */
 const slotRegistry = reactive<
@@ -161,6 +174,35 @@ const contentProfiles = reactive<
     }
   >
 >({});
+/** 插件注册的图片变换（SFW 模糊等），宿主卡片/日历统一调用 */
+const contentProfileImageTransformers = new Map<
+  string,
+  (url: string) => string
+>();
+
+export function registerContentProfileImageTransformer(
+  profile: string,
+  transformer: (url: string) => string,
+): void {
+  if (!profile || typeof transformer !== 'function') return;
+  contentProfileImageTransformers.set(profile, transformer);
+}
+
+export function getContentProfileImageUrl(
+  profile: null | string | undefined,
+  url: null | string | undefined,
+): string {
+  if (!url) return '';
+  const transformer = profile
+    ? contentProfileImageTransformers.get(profile)
+    : undefined;
+  if (!transformer) return url;
+  try {
+    return transformer(url) || url;
+  } catch {
+    return url;
+  }
+}
 
 const CORE_PROFILE_LABELS: Record<string, string> = {
   anime: '动漫',
@@ -241,8 +283,10 @@ export function getContentProfileOptions(): Array<{
 }
 
 function registerContentProfiles(plugin: PluginManifestFrontend) {
+  const keys: string[] = [];
   for (const profile of plugin.frontend.content_profiles || []) {
     if (!profile.key) continue;
+    keys.push(profile.key);
     contentProfiles[profile.key] = {
       defaultDetailSource: profile.default_detail_source || '',
       overviewFallback: profile.overview_fallback || '',
@@ -260,6 +304,7 @@ function registerContentProfiles(plugin: PluginManifestFrontend) {
         : [],
     };
   }
+  pluginProfileKeys.set(plugin.id, keys);
 }
 
 export interface PluginManifestFrontend {
@@ -487,7 +532,11 @@ export async function loadPluginFrontend(
   plugin: PluginManifestFrontend,
 ): Promise<void> {
   if (!plugin.enabled) return;
-  pluginFrontendVersions.set(plugin.id, plugin.version || '');
+  // 保留强制刷新写入的带时间戳版本，确保重新 import 时绕过模块缓存。
+  const forcedVersion = pluginFrontendVersions.get(plugin.id);
+  if (!forcedVersion || !forcedVersion.startsWith(`${plugin.version || ''}-`)) {
+    pluginFrontendVersions.set(plugin.id, plugin.version || '');
+  }
 
   try {
     // 如果有前端组件，先 import ESM 模块
@@ -567,6 +616,9 @@ export async function loadAllPluginFrontends(): Promise<void> {
     for (const plugin of plugins) {
       if (plugin.enabled) {
         await loadPluginFrontend(plugin);
+      } else if (loadedModules.has(plugin.id)) {
+        // 禁用插件时清理旧路由/画像/模块，避免单页会话继续命中旧 bundle。
+        unloadPluginFrontend(plugin.id);
       }
     }
     _pluginsLoaded = true;
@@ -614,6 +666,18 @@ export function getSlotComponents(target: string): SlotComponent[] {
 /**
  * 卸载插件前端资源
  */
+/** 强制下次加载使用新的版本号，绕过浏览器 ESM 模块缓存。 */
+export function forcePluginFrontendRefresh(
+  pluginId: string,
+  version?: string,
+): void {
+  loadedModules.delete(pluginId);
+  pluginFrontendVersions.set(
+    pluginId,
+    `${version || ''}-${Date.now()}`.replace(/^-/, ''),
+  );
+}
+
 export function unloadPluginFrontend(pluginId: string): void {
   // 移除路由
   const routes = pluginRoutes.get(pluginId);
@@ -634,14 +698,35 @@ export function unloadPluginFrontend(pluginId: string): void {
     }
   }
 
+  // 清理宿主页路径映射
+  const routesForPath = pluginRoutes.get(pluginId) || [];
+  for (const entry of routesForPath) {
+    const path = String(entry.path || '');
+    if (path) delete pluginPathComponents[path];
+  }
+  for (const path of Object.keys(pluginPathComponents)) {
+    if (pluginPathComponents[path]?.pluginId === pluginId) {
+      delete pluginPathComponents[path];
+    }
+  }
+
+  // 清理内容画像与版本缓存
+  for (const key of pluginProfileKeys.get(pluginId) || []) {
+    delete contentProfiles[key];
+    contentProfileImageTransformers.delete(key);
+  }
+  pluginProfileKeys.delete(pluginId);
+
   // 清除 ESM 模块缓存
   loadedModules.delete(pluginId);
+  pluginFrontendVersions.delete(pluginId);
 }
 
 export default {
   loadPluginFrontend,
   loadAllPluginFrontends,
   unloadPluginFrontend,
+  forcePluginFrontendRefresh,
   getComponent,
   getSlotComponents,
 };

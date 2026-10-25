@@ -9,11 +9,16 @@ import { IconifyIcon } from '@vben/icons';
 import { NButton, NSpin } from 'naive-ui';
 
 import { getDiscoveryItemsApi, getDiscoveryProvidersApi } from '#/api';
+import {
+  getMovieSubscriptionApi,
+  getTvSubscriptionApi,
+} from '#/api/modules/subscription';
 import EmptyState from '#/components/empty/EmptyState.vue';
 import MediaCard from '#/components/media/MediaCard.vue';
 import PageHeader from '#/components/page/PageHeader.vue';
 import {
   getContentProfileDetailPath,
+  getContentProfileOptions,
   getContentProfilePresentationType,
   PluginSlot,
 } from '#/plugin-framework';
@@ -249,7 +254,12 @@ async function loadItems(reset = false) {
     const merged = reset ? list : [...items.value, ...list];
     const seen = new Set<string>();
     items.value = merged.filter((item) => {
-      const key = `${item.provider}:${item.ref?.external_id || item.title}`;
+      // 同一内容的不同版本（如 Blu-ray/通常版）共用一个 anchor content_id，
+      // 优先按锚点去重，避免探索页出现重复卡片。
+      const anchor = item.anchor_ref;
+      const key = anchor?.external_id
+        ? `${item.content_profile || 'default'}:${anchor.provider}:${anchor.external_id}`
+        : `${item.provider}:${item.ref?.external_id || item.title}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -263,29 +273,164 @@ async function loadItems(reset = false) {
   }
 }
 
-function selectProvider(provider: string) {
+function beginTabSwitch() {
+  // 立即清空并让在途请求失效，避免切换后短暂显示旧榜单内容。
+  loadSeq += 1;
+  page.value = 1;
+  items.value = [];
+  hasMore.value = true;
+  loading.value = true;
+  selectedWeekday.value = '';
+  selectedGenre.value = '';
+  genreOptions.value = [];
+  genreOptionsFeed.value = '';
+}
+
+async function selectProvider(provider: string) {
   if (provider === activeProvider.value) return;
   activeProvider.value = provider;
   activeFeed.value =
     sources.value.find((item) => item.provider === provider)?.feeds[0]?.key ||
     '';
-  selectedWeekday.value = '';
-  selectedGenre.value = '';
-  genreOptions.value = [];
-  genreOptionsFeed.value = '';
+  beginTabSwitch();
   savePreference();
+  // 等 facets/activeFeedConfig 重新计算后再请求，避免切 tab 仍用旧榜单参数。
+  await nextTick();
   loadItems(true);
 }
 
-function selectFeed(feed: string) {
+async function selectFeed(feed: string) {
   if (feed === activeFeed.value) return;
   activeFeed.value = feed;
-  selectedWeekday.value = '';
-  selectedGenre.value = '';
-  genreOptions.value = [];
-  genreOptionsFeed.value = '';
+  beginTabSwitch();
   savePreference();
+  await nextTick();
   loadItems(true);
+}
+
+interface SubscriptionStatus {
+  fav: string;
+  rssid: string;
+}
+
+const subscriptionIndex = ref(new Map<string, SubscriptionStatus>());
+
+function addSubscriptionKey(
+  map: Map<string, SubscriptionStatus>,
+  key: string | undefined,
+  status: SubscriptionStatus,
+) {
+  if (key && !map.has(key)) map.set(key, status);
+}
+
+function normalizeMediaTitle(title: string): string {
+  // 只保留字母/数字/汉字，抹平空格、冒号、间隔号等来源差异。
+  return (
+    String(title || '')
+      .toLowerCase()
+      .match(/[\p{L}\p{N}]+/gu) || []
+  ).join('');
+}
+
+function addTitleKeys(
+  map: Map<string, SubscriptionStatus>,
+  title: string,
+  year: string,
+  status: SubscriptionStatus,
+) {
+  const normalized = normalizeMediaTitle(title);
+  if (!normalized) return;
+  addSubscriptionKey(map, `title:${normalized}:${year}`, status);
+  // 不同来源标题可能只有空格/冒号差异，年份也可能缺失，保留纯标题兜底。
+  addSubscriptionKey(map, `title:${normalized}`, status);
+}
+
+function subscriptionKeys(sub: any): string[] {
+  const keys: string[] = [];
+  const anchorProvider = String(
+    sub.anchor_provider || sub.provider || '',
+  ).trim();
+  const anchorExternal = String(sub.anchor_external_id || '').trim();
+  if (anchorProvider && anchorExternal) {
+    keys.push(`anchor:${anchorProvider}:${anchorExternal}`);
+  }
+  if (anchorExternal) keys.push(`external:${anchorExternal}`);
+  if (sub.tmdbid) keys.push(`tmdb:${sub.tmdbid}`);
+  if (sub.keyword) {
+    keys.push(`keyword:${sub.content_profile || 'default'}:${sub.keyword}`);
+    keys.push(`keyword:${sub.keyword}`);
+  }
+  if (sub.name) keys.push(`name:${sub.name}:${sub.year || ''}`);
+  return keys;
+}
+
+async function loadSubscriptionIndex() {
+  try {
+    const movieProfiles = [
+      'default',
+      ...getContentProfileOptions()
+        .filter(
+          (option) =>
+            !['anime', 'tv'].includes(
+              getContentProfilePresentationType(option.value) || 'movie',
+            ),
+        )
+        .map((option) => option.value),
+    ];
+    const [movies, tvs] = await Promise.all([
+      Promise.all(
+        movieProfiles.map((profile) =>
+          getMovieSubscriptionApi(undefined, profile).catch(() => []),
+        ),
+      ),
+      getTvSubscriptionApi().catch(() => []),
+    ]);
+    const index = new Map<string, SubscriptionStatus>();
+    for (const sub of [...movies.flat(), ...(tvs as any[])]) {
+      if (!sub?.id) continue;
+      const status = { fav: '1', rssid: String(sub.id) };
+      for (const key of subscriptionKeys(sub)) {
+        addSubscriptionKey(index, key, status);
+      }
+      addTitleKeys(index, sub.name || '', String(sub.year || ''), status);
+    }
+    subscriptionIndex.value = index;
+  } catch {
+    subscriptionIndex.value = new Map();
+  }
+}
+
+function subscriptionFor(
+  item: DiscoveryApi.Item,
+): SubscriptionStatus | undefined {
+  const index = subscriptionIndex.value;
+  const anchorProvider = item.anchor_ref?.provider;
+  const anchorExternal = item.anchor_ref?.external_id;
+  if (anchorProvider && anchorExternal) {
+    const found = index.get(`anchor:${anchorProvider}:${anchorExternal}`);
+    if (found) return found;
+  }
+  if (anchorExternal) {
+    const found = index.get(`external:${anchorExternal}`);
+    if (found) return found;
+  }
+  if (item.provider === 'tmdb' && item.ref.external_id) {
+    const found = index.get(`tmdb:${item.ref.external_id}`);
+    if (found) return found;
+  }
+  const external = item.ref.external_id || '';
+  const keywordKey = index.get(
+    `keyword:${item.content_profile || 'default'}:${external}`,
+  );
+  if (keywordKey) return keywordKey;
+  const byName = index.get(`name:${item.title}:${item.year || ''}`);
+  if (byName) return byName;
+  // 不同元数据源标题可能只差空格/冒号（如“龙珠超：比鲁斯” vs “龙珠超 比鲁斯”）。
+  const normalized = normalizeMediaTitle(item.title);
+  return (
+    index.get(`title:${normalized}:${item.year || ''}`) ||
+    index.get(`title:${normalized}`)
+  );
 }
 
 function itemId(item: DiscoveryApi.Item) {
@@ -448,8 +593,9 @@ watch(
 
 watch(
   () => route.name,
-  () => {
+  async () => {
     applyPreset();
+    await nextTick();
     loadItems(true);
   },
 );
@@ -467,7 +613,7 @@ watch(
 );
 
 onMounted(async () => {
-  await loadSources();
+  await Promise.all([loadSources(), loadSubscriptionIndex()]);
   await loadItems(true);
   await nextTick();
   setupLoadMoreObserver();
@@ -672,6 +818,8 @@ onUnmounted(() => {
             :content-profile="item.content_profile"
             :metadata-ref="itemMetadataRef(item)"
             :detail-link="itemDetailLink(item)"
+            :fav="subscriptionFor(item)?.fav || '0'"
+            :rssid="subscriptionFor(item)?.rssid || ''"
             @search="() => handleCardSearch(item)"
           />
         </div>

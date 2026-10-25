@@ -26,8 +26,10 @@ import {
 } from '#/api/modules/plugin_framework';
 import PageHeader from '#/components/page/PageHeader.vue';
 import {
+  forcePluginFrontendRefresh,
   loadAllPluginFrontends,
   resetPluginLoadedFlag,
+  unloadPluginFrontend,
 } from '#/plugin-framework/loader';
 import { generateAccess } from '#/router/access';
 import { accessRoutes } from '#/router/routes';
@@ -131,6 +133,11 @@ async function handleToggle(plugin: any) {
       await enablePluginApi(plugin.id);
       notification.success(`${plugin.name} 已启用`);
     }
+    if (!plugin.enabled) {
+      forcePluginFrontendRefresh(plugin.id, plugin.version);
+    } else {
+      unloadPluginFrontend(plugin.id);
+    }
     await fetchPlugins();
     await refreshSidebarMenus();
   } catch (error: any) {
@@ -143,6 +150,7 @@ async function handleUninstall(plugin: any) {
     await uninstallPluginApi(plugin.id, purgePluginData.value);
     purgePluginData.value = false;
     notification.success(`${plugin.name} 已卸载`);
+    unloadPluginFrontend(plugin.id);
     await fetchPlugins();
     await refreshSidebarMenus();
   } catch (error: any) {
@@ -162,6 +170,10 @@ async function handleRun(plugin: any) {
 async function handleReload(plugin: any) {
   try {
     await reloadPluginApi(plugin.id);
+    unloadPluginFrontend(plugin.id);
+    forcePluginFrontendRefresh(plugin.id, plugin.version);
+    await fetchPlugins();
+    await refreshSidebarMenus();
     notification.success(`${plugin.name} 已重载`);
   } catch (error: any) {
     notification.error('重载失败', { description: error?.message || '' });
