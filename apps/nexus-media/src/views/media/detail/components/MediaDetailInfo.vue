@@ -1,7 +1,9 @@
 <script lang="ts" setup>
+import { computed, type CSSProperties, ref } from 'vue';
+
 import { IconifyIcon } from '@vben/icons';
 
-import { NTag } from 'naive-ui';
+import { NButton, NTag } from 'naive-ui';
 
 import CastList from './CastList.vue';
 import FactPanel from './FactPanel.vue';
@@ -12,10 +14,25 @@ interface Props {
   genres?: string[];
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   actors: () => [],
   genres: () => [],
 });
+
+const overviewExpanded = ref(false);
+const overviewLong = computed(
+  () => String(props.detail.overview || '').length > 320,
+);
+const overviewStyle = computed(() =>
+  !overviewExpanded.value && overviewLong.value
+    ? ({
+        display: '-webkit-box',
+        WebkitBoxOrient: 'vertical',
+        WebkitLineClamp: 6,
+        overflow: 'hidden',
+      } as CSSProperties)
+    : ({} as CSSProperties),
+);
 </script>
 
 <template>
@@ -40,10 +57,20 @@ withDefaults(defineProps<Props>(), {
       </div>
       <p
         class="whitespace-pre-wrap text-sm leading-7"
-        style="color: hsl(var(--muted-foreground))"
+        :style="[{ color: 'hsl(var(--muted-foreground))' }, overviewStyle]"
       >
         {{ detail.overview }}
       </p>
+      <NButton
+        v-if="overviewLong"
+        text
+        size="small"
+        class="mt-2"
+        style="color: hsl(var(--primary))"
+        @click="overviewExpanded = !overviewExpanded"
+      >
+        {{ overviewExpanded ? '收起' : '展开' }}
+      </NButton>
     </section>
 
     <section
