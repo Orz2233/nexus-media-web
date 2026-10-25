@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, type CSSProperties, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 
@@ -31,21 +31,6 @@ const emit = defineEmits<{
   search: [];
   subscribe: [];
 }>();
-
-const overviewExpanded = ref(false);
-const overviewLong = computed(
-  () => String(props.detail.overview || '').length > 220,
-);
-const overviewStyle = computed(() =>
-  !overviewExpanded.value && overviewLong.value
-    ? ({
-        display: '-webkit-box',
-        WebkitBoxOrient: 'vertical',
-        WebkitLineClamp: 4,
-        overflow: 'hidden',
-      } as CSSProperties)
-    : ({} as CSSProperties),
-);
 
 const isTv = computed(() => props.detail.type !== 'movie');
 
@@ -287,25 +272,6 @@ function imageUrl(url?: any) {
               <IconifyIcon icon="lucide:play" class="size-4" />
             </template>
             在线观看
-          </NButton>
-        </div>
-
-        <div v-if="detail.overview" class="max-w-3xl">
-          <div
-            class="whitespace-pre-wrap text-sm leading-relaxed"
-            :style="[{ color: 'hsl(var(--muted-foreground))' }, overviewStyle]"
-          >
-            {{ detail.overview }}
-          </div>
-          <NButton
-            v-if="overviewLong"
-            text
-            size="small"
-            class="mt-1"
-            style="color: hsl(var(--primary))"
-            @click="overviewExpanded = !overviewExpanded"
-          >
-            {{ overviewExpanded ? '收起' : '展开' }}
           </NButton>
         </div>
       </div>
