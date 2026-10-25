@@ -11,7 +11,6 @@ import { NButton, NSpin } from 'naive-ui';
 import {
   getDiscoveryItemsApi,
   getDiscoveryProvidersApi,
-  getMediaDetailByRefApi,
 } from '#/api/modules/media';
 import {
   getMovieSubscriptionApi,
@@ -40,9 +39,6 @@ const loading = ref(false);
 const loadingMore = ref(false);
 const loadingSources = ref(true);
 const loadError = ref<null | { message: string; retryable: boolean }>(null);
-const prefetchedDetails = new Set<string>();
-let prefetching = false;
-const prefetchQueue: DiscoveryApi.Item[] = [];
 const selectedSeasonQuarter = ref(currentSeason().split('-q')[1]);
 const selectedYear = ref(String(new Date().getFullYear()));
 const selectedSeason = computed(
@@ -305,7 +301,6 @@ async function loadItems(reset = false) {
       return true;
     });
     hasMore.value = Boolean(result?.has_more);
-    if (reset) scheduleDetailPrefetch(items.value);
   } catch {
     // 超时/失败时停止无限滚动，避免底部一直显示加载中。
     if (seq === loadSeq) {
@@ -317,50 +312,6 @@ async function loadItems(reset = false) {
       loading.value = false;
       loadingMore.value = false;
     }
-  }
-}
-
-function scheduleDetailPrefetch(list: DiscoveryApi.Item[]) {
-  if (!list.length || typeof window === 'undefined') return;
-  for (const item of list.slice(0, 4)) {
-    if (
-      !item.actions?.includes('detail') ||
-      !item.ref?.provider ||
-      !item.ref.external_id
-    ) {
-      continue;
-    }
-    const key = `${item.ref.provider}:${item.ref.external_id}`;
-    if (prefetchedDetails.has(key)) continue;
-    prefetchedDetails.add(key);
-    prefetchQueue.push(item);
-  }
-  if (!prefetchQueue.length || prefetching) return;
-  const run = () => void runPrefetchQueue();
-  const idle = (window as any).requestIdleCallback;
-  if (typeof idle === 'function') idle(run, { timeout: 2000 });
-  else setTimeout(run, 800);
-}
-
-async function runPrefetchQueue() {
-  if (prefetching) return;
-  prefetching = true;
-  try {
-    while (prefetchQueue.length) {
-      const item = prefetchQueue.shift();
-      if (!item) continue;
-      try {
-        await getMediaDetailByRefApi(
-          item.ref.provider,
-          item.ref.external_id,
-          itemType(item),
-        );
-      } catch {
-        // 预取失败不打扰用户，详情页会正常重试。
-      }
-    }
-  } finally {
-    prefetching = false;
   }
 }
 
