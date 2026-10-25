@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { IconifyIcon } from '@vben/icons';
 
-import { NButton, NModal, NSpin, NTab, NTabs } from 'naive-ui';
+import { NButton, NSpin, NTab, NTabs } from 'naive-ui';
 
 import {
   deleteSubscriptionHistoryApi,
@@ -13,6 +13,7 @@ import {
 } from '#/api';
 import EmptyState from '#/components/empty/EmptyState.vue';
 import PageHeader from '#/components/page/PageHeader.vue';
+import SubscriptionDeleteModal from '#/components/subscribe/SubscriptionDeleteModal.vue';
 import {
   getContentProfileDetailPath,
   getContentProfileLabel,
@@ -87,9 +88,11 @@ const filterProfile = computed(() => activeTab.value.profile);
 const pageTitle = '订阅历史';
 const backPath = computed(() => {
   if (activeTab.value.profile !== 'default') {
-    return (
-      getContentProfileDetailPath(activeTab.value.profile) || '/subscription/tv'
-    );
+    // detailPath 形如 /subscription/<profile>/detail，返回列表时去掉 /detail。
+    const detailPath = getContentProfileDetailPath(activeTab.value.profile);
+    if (detailPath) {
+      return detailPath.replace(/\/detail\/?$/, '') || detailPath;
+    }
   }
   return filterType.value === 'tv' ? '/subscription/tv' : '/subscription/movie';
 });
@@ -131,7 +134,11 @@ async function fetchData() {
 
 async function handleReRss(item: any) {
   try {
-    await redoSubscriptionHistoryApi(item.id, filterType.value);
+    await redoSubscriptionHistoryApi(
+      item.id,
+      filterType.value,
+      filterProfile.value,
+    );
     notification.success('重新订阅成功');
     await fetchData();
   } catch (error: any) {
@@ -207,17 +214,12 @@ onMounted(fetchData);
       />
     </NSpin>
 
-    <NModal
+    <SubscriptionDeleteModal
       v-model:show="deleteModalShow"
-      title="确认删除"
-      preset="dialog"
-      type="warning"
-      positive-text="确认"
-      negative-text="取消"
-      @positive-click="confirmDelete"
-    >
-      <p>确定要删除「{{ deleteTarget?.title }}」的订阅历史吗？</p>
-    </NModal>
+      :item="deleteTarget"
+      kind="history"
+      @confirm="confirmDelete"
+    />
   </div>
 </template>
 

@@ -33,6 +33,7 @@ export interface SubscribeConfirmItem {
   overview?: string;
   content_profile?: string;
   metadata_ref?: string;
+  provider?: string;
 }
 
 const props = defineProps<{

@@ -193,6 +193,9 @@ async function handleSubscribe() {
       type: 'tv',
       image: detail.value.image || detail.value.poster,
       overview: detail.value.overview,
+      content_profile: (detail.value as any).content_profile,
+      metadata_ref: (detail.value as any).metadata_ref,
+      provider: (detail.value as any).provider,
     };
     subscribeConfirmShow.value = true;
     return;
@@ -205,6 +208,7 @@ async function handleSubscribe() {
         type: mediaType.value,
         rssid: detail.value.rssid,
         tmdbid: mediaId.value,
+        content_profile: (detail.value as any).content_profile,
       });
       fav.value = '0';
       message.success('已删除订阅');
@@ -214,6 +218,9 @@ async function handleSubscribe() {
         year: detail.value.year || '',
         type: mediaType.value,
         mediaid: subscribeMediaId.value,
+        content_profile: (detail.value as any).content_profile,
+        metadata_ref: (detail.value as any).metadata_ref,
+        provider: (detail.value as any).provider,
       });
       fav.value = '1';
       message.success('已添加订阅');
@@ -239,6 +246,9 @@ async function handleConfirmSubscribe(payload: {
         type: 'tv',
         mediaid: subscribeMediaId.value,
         season: String(season),
+        content_profile: (detail.value as any).content_profile,
+        metadata_ref: (detail.value as any).metadata_ref,
+        provider: (detail.value as any).provider,
       });
     }
     for (const season of remove) {
@@ -248,6 +258,7 @@ async function handleConfirmSubscribe(payload: {
         type: 'tv',
         tmdbid: subscribeMediaId.value,
         season: String(season),
+        content_profile: (detail.value as any).content_profile,
       });
     }
     fav.value = selected.length > 0 ? '1' : '0';
@@ -269,7 +280,10 @@ async function handleEditSubscribe() {
   const mtype = it.type === 'movie' ? 'movie' : 'tv';
   let defaults: any = {};
   try {
-    const res: any = await getDefaultSubscriptionSettingApi(mtype);
+    const res: any = await getDefaultSubscriptionSettingApi(
+      mtype,
+      it.content_profile,
+    );
     defaults = res?.data || res || {};
   } catch {
     // ignore
@@ -280,6 +294,9 @@ async function handleEditSubscribe() {
     type: mtype,
     tmdbid: String(it.tmdbid || it.id || ''),
     image: it.image,
+    content_profile: it.content_profile,
+    metadata_ref: it.metadata_ref,
+    mediaid: it.mediaid,
     season: '',
     fuzzy_match: false,
     over_edition: !!(
@@ -310,7 +327,9 @@ async function handleEditSubscribe() {
 
 async function handleConfirmEdit(data: Record<string, any>) {
   try {
-    await addSubscriptionApi(data);
+    const isCustom =
+      !!data.content_profile && data.content_profile !== 'default';
+    await (isCustom ? addSubscriptionMediaApi(data) : addSubscriptionApi(data));
     fav.value = '1';
     if (data.season) {
       const s = Number(data.season);

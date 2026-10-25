@@ -25,7 +25,10 @@ import { IconifyIcon } from '@vben/icons';
 
 import { NTag } from 'naive-ui';
 
-import { getContentProfilePosterPosition } from '#/plugin-framework/loader';
+import {
+  getContentProfileImageUrl,
+  getContentProfilePosterPosition,
+} from '#/plugin-framework/loader';
 import { getImgUrl } from '#/utils/image';
 import { formatPix, formatRestype } from '#/utils/subscribe';
 
@@ -115,14 +118,23 @@ const ownerInitial = computed(() =>
 const sourceText = computed(() => {
   const declared = String(props.item.source_label || '').trim();
   if (declared) return declared;
-  let provider = String(props.item.anchor_provider || '').trim();
-  if (!provider) {
-    const profile = String(props.item.content_profile || '').trim();
-    const mediaid = String(props.item.mediaid || '').trim();
-    if (profile && profile !== 'default') provider = 'content_id';
-    else if (mediaid.startsWith('DB:')) provider = 'douban';
-    else if (mediaid.startsWith('BG:')) provider = 'bangumi';
-    else if (props.item.tmdbid) provider = 'tmdb';
+  let provider = String(
+    props.item.provider || props.item.anchor_provider || '',
+  ).trim();
+  const metadataRef = String(
+    props.item.metadata_ref || props.item.mediaid || '',
+  ).trim();
+  if (!provider || provider === 'content_id') {
+    const refProvider = metadataRef.split(':')[0]?.trim();
+    if (refProvider && refProvider !== 'content_id') {
+      provider = refProvider;
+    } else {
+      const profile = String(props.item.content_profile || '').trim();
+      if (profile && profile !== 'default') provider = 'content_id';
+      else if (metadataRef.startsWith('DB:')) provider = 'douban';
+      else if (metadataRef.startsWith('BG:')) provider = 'bangumi';
+      else if (props.item.tmdbid) provider = 'tmdb';
+    }
   }
   if (!provider) return '未知';
   if (provider === 'content_id') return '插件';
@@ -147,17 +159,23 @@ const showProgress = computed(
   () => props.type !== 'movie' && props.item.total && props.item.total > 0,
 );
 
+const downloadedCount = computed(() => {
+  const total = Number(props.item.total) || 0;
+  const current = Number(props.item.current_ep) || 0;
+  if (current > 0) return Math.max(0, Math.min(total, current - 1));
+  const lack = Number(props.item.lack) || 0;
+  return Math.max(0, total - lack);
+});
+
 const progressPercent = computed(() => {
   if (!showProgress.value) return 0;
-  const total = props.item.total || 0;
-  const lack = props.item.lack || 0;
-  return Math.round(((total - lack) / total) * 100);
+  const total = Number(props.item.total) || 0;
+  return total > 0 ? Math.round((downloadedCount.value / total) * 100) : 0;
 });
 
 const progressText = computed(() => {
-  const total = props.item.total || 0;
-  const lack = props.item.lack || 0;
-  return `${total - lack} / ${total}`;
+  const total = Number(props.item.total) || 0;
+  return `${downloadedCount.value} / ${total}`;
 });
 
 const overviewText = computed(() => {
@@ -323,7 +341,14 @@ onMounted(ensureOutsideListener);
     <!-- 海报（桌面点击进详情 / 移动端点击展开） -->
     <div class="shc-poster" @click="onPosterClick">
       <img
-        :src="getImgUrl(item.image || item.poster)"
+        :src="
+          getImgUrl(
+            getContentProfileImageUrl(
+              item.content_profile,
+              item.image || item.poster,
+            ),
+          )
+        "
         class="shc-poster-img"
         :style="{ objectPosition: posterPosition }"
         alt=""

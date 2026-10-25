@@ -22,7 +22,10 @@ import { computed, onMounted } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 
-import { getContentProfilePosterPosition } from '#/plugin-framework/loader';
+import {
+  getContentProfileImageUrl,
+  getContentProfilePosterPosition,
+} from '#/plugin-framework/loader';
 import { getImgUrl } from '#/utils/image';
 import { formatPix, formatRestype } from '#/utils/subscribe';
 
@@ -104,14 +107,19 @@ const sourceText = computed(() => {
       labels.add(declared);
       continue;
     }
-    let provider = String(item.anchor_provider || '').trim();
-    if (!provider) {
-      const profile = String(item.content_profile || '').trim();
-      const mediaid = String(item.mediaid || '').trim();
-      if (profile && profile !== 'default') provider = 'content_id';
-      else if (mediaid.startsWith('DB:')) provider = 'douban';
-      else if (mediaid.startsWith('BG:')) provider = 'bangumi';
-      else if (item.tmdbid) provider = 'tmdb';
+    let provider = String(item.provider || item.anchor_provider || '').trim();
+    const metadataRef = String(item.metadata_ref || item.mediaid || '').trim();
+    if (!provider || provider === 'content_id') {
+      const refProvider = metadataRef.split(':')[0]?.trim();
+      if (refProvider && refProvider !== 'content_id') {
+        provider = refProvider;
+      } else {
+        const profile = String(item.content_profile || '').trim();
+        if (profile && profile !== 'default') provider = 'content_id';
+        else if (metadataRef.startsWith('DB:')) provider = 'douban';
+        else if (metadataRef.startsWith('BG:')) provider = 'bangumi';
+        else if (item.tmdbid) provider = 'tmdb';
+      }
     }
     if (!provider) continue;
     if (provider === 'content_id') labels.add('插件');
@@ -177,10 +185,15 @@ function itemProgress(item: Record<string, any>) {
   if (props.type === 'movie') return null;
   const total = Number(item.total) || 0;
   if (!total) return null;
+  const current = Number(item.current_ep) || 0;
   const lack = Number(item.lack) || 0;
+  const downloaded =
+    current > 0
+      ? Math.max(0, Math.min(total, current - 1))
+      : Math.max(0, total - lack);
   return {
-    percent: Math.round(((total - lack) / total) * 100),
-    text: `${total - lack}/${total}`,
+    percent: Math.round((downloaded / total) * 100),
+    text: `${downloaded}/${total}`,
   };
 }
 
@@ -251,7 +264,11 @@ onMounted(ensureOutsideListener);
     <!-- 海报 -->
     <div class="sgc-poster" @click="onPosterClick">
       <img
-        :src="getImgUrl(image)"
+        :src="
+          getImgUrl(
+            getContentProfileImageUrl(props.items[0]?.content_profile, image),
+          )
+        "
         class="sgc-poster-img"
         :style="{ objectPosition: posterPosition }"
         alt=""

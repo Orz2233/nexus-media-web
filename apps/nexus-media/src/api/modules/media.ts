@@ -783,3 +783,13 @@ export async function getDiscoveryItemsApi(params: {
     ...params,
   });
 }
+
+/** 按 provider ref 获取元数据详情（用于缺失海报兜底） */
+export async function lookupMetadataApi(data: {
+  allow_missing?: boolean;
+  external_id: string;
+  provider: string;
+  scope?: string;
+}) {
+  return requestClient.get<any>('/media/lookup', { params: data });
+}

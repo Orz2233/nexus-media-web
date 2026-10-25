@@ -2,7 +2,7 @@
 import type { SubscribeConfirmItem } from '#/components/subscribe/SubscribeConfirmModal.vue';
 import type { SubscribeEditItem } from '#/components/subscribe/SubscribeEditModal.vue';
 
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { IconifyIcon } from '@vben/icons';
@@ -19,6 +19,7 @@ import {
 import SubscribeConfirmModal from '#/components/subscribe/SubscribeConfirmModal.vue';
 import SubscribeEditModal from '#/components/subscribe/SubscribeEditModal.vue';
 import {
+  getContentProfileImageUrl,
   getContentProfileLabel,
   getContentProfilePosterPosition,
 } from '#/plugin-framework';
@@ -64,6 +65,20 @@ const unsubscribing = ref(false);
 const _fav = ref(props.fav || '0');
 const _rssid = ref(props.rssid || '');
 
+// 探索页订阅状态是异步加载的，props 更新后必须同步到卡片内部状态。
+watch(
+  () => props.fav,
+  (value) => {
+    _fav.value = value || '0';
+  },
+);
+watch(
+  () => props.rssid,
+  (value) => {
+    _rssid.value = value || '';
+  },
+);
+
 const typeLabel = computed(() => {
   // 自定义画像优先使用插件标签；插件前端未就绪时也不回落成“电影”
   if (props.contentProfile && props.contentProfile !== 'default') {
@@ -79,7 +94,9 @@ const typeLabel = computed(() => {
   return '';
 });
 
-const posterUrl = computed(() => getImgUrl(props.poster));
+const posterUrl = computed(() =>
+  getImgUrl(getContentProfileImageUrl(props.contentProfile, props.poster)),
+);
 const posterPosition = computed(
   () => getContentProfilePosterPosition(props.contentProfile) || '50% 50%',
 );
@@ -98,7 +115,7 @@ const subscribeMediaId = computed(() => {
   if (provider === 'douban') return `DB:${externalId}`;
   if (provider === 'bangumi') return `BG:${externalId}`;
   if (provider === 'content_id') {
-    // 内容编号是身份锚点；订阅来源仍取实际 provider（如 JavDB）。
+    // 内容编号是身份锚点；订阅来源仍取实际 provider。
     const sourceProvider = String(props.metadataRef || '').split(':')[0];
     return `${sourceProvider || 'content_id'}:${externalId}`;
   }
@@ -169,6 +186,7 @@ function handleSubscribe(e: Event) {
     overview: props.overview,
     content_profile: props.contentProfile,
     metadata_ref: props.metadataRef,
+    provider: props.anchorProvider,
   };
   subscribeShow.value = true;
 }
@@ -210,6 +228,7 @@ async function handleConfirmSubscribe(payload: {
           metadata_policy:
             payload.policy === 'auto' ? undefined : payload.policy,
           metadata_ref: it.metadata_ref,
+          provider: it.provider,
           content_profile: it.content_profile,
           image: it.image || props.poster || posterUrl.value,
         });
@@ -221,6 +240,7 @@ async function handleConfirmSubscribe(payload: {
           type: 'tv',
           tmdbid: String(it.tmdbid || it.id),
           season: String(season),
+          content_profile: it.content_profile,
         });
       }
       _fav.value = selected.length > 0 ? '1' : '0';
@@ -238,6 +258,7 @@ async function handleConfirmSubscribe(payload: {
         type: typeParam,
         mediaid: it.mediaid || String(it.id),
         metadata_ref: it.metadata_ref,
+        provider: it.provider,
         content_profile: it.content_profile,
         metadata_policy: payload.policy === 'auto' ? undefined : payload.policy,
         image: it.image || props.poster || posterUrl.value,
@@ -261,7 +282,10 @@ async function handleEditSubscribe() {
   const mtype = it.type === 'movie' ? 'movie' : 'tv';
   let defaults: any = {};
   try {
-    const res: any = await getDefaultSubscriptionSettingApi(mtype);
+    const res: any = await getDefaultSubscriptionSettingApi(
+      mtype,
+      it.content_profile,
+    );
     defaults = res?.data || res || {};
   } catch {
     // ignore
@@ -272,6 +296,9 @@ async function handleEditSubscribe() {
     type: mtype,
     tmdbid: String(it.tmdbid || it.id || ''),
     image: it.image,
+    content_profile: it.content_profile,
+    metadata_ref: it.metadata_ref,
+    mediaid: it.mediaid,
     season: '',
     fuzzy_match: false,
     over_edition: !!(
@@ -302,7 +329,11 @@ async function handleEditSubscribe() {
 
 async function handleConfirmEdit(data: Record<string, any>) {
   try {
-    const res: any = await addSubscriptionApi(data);
+    const isCustom =
+      !!data.content_profile && data.content_profile !== 'default';
+    const res: any = isCustom
+      ? await addSubscriptionMediaApi(data)
+      : await addSubscriptionApi(data);
     _fav.value = '1';
     if (res?.rssid) _rssid.value = String(res.rssid);
     notification.success('订阅成功', {
