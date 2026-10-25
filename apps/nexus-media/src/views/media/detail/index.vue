@@ -81,6 +81,7 @@ async function loadDetail() {
           detailExternalId.value,
           mediaType.value,
           detailProfile.value,
+          String(route.query.id || ''),
         )
       : await getMediaDetailApi(mediaId.value, tmdbType.value);
     if (res && typeof res === 'object' && res.title) {

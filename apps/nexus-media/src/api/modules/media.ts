@@ -86,12 +86,14 @@ export async function getMediaDetailByRefApi(
   externalId: string,
   mediaType?: string,
   contentProfile?: string,
+  contentId?: string,
 ) {
   return requestClient.post<Record<string, any>>('/media/detail_by_ref', {
     provider,
     external_id: externalId,
     media_type: mediaType,
     content_profile: contentProfile || undefined,
+    content_id: contentId || undefined,
   });
 }
 
