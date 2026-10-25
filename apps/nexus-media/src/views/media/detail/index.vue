@@ -46,6 +46,7 @@ const detailProvider = computed(() => String(route.query.provider || ''));
 const detailExternalId = computed(() =>
   String(route.query.ref || route.query.external_id || ''),
 );
+const detailProfile = computed(() => String(route.query.profile || ''));
 const isExternalDetail = computed(
   () => !!detailProvider.value && detailProvider.value !== 'tmdb',
 );
@@ -79,6 +80,7 @@ async function loadDetail() {
           detailProvider.value,
           detailExternalId.value,
           mediaType.value,
+          detailProfile.value,
         )
       : await getMediaDetailApi(mediaId.value, tmdbType.value);
     if (res && typeof res === 'object' && res.title) {
