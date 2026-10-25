@@ -89,6 +89,8 @@ const sourceLinks = computed<Array<{ label: string; url: string }>>(() => {
   return [{ label: 'TMDB', url: tmdbUrl.value }];
 });
 
+const detailUrl = computed(() => props.detail.link || tmdbUrl.value);
+
 const subscribedLabel = computed(() => {
   if (props.fav !== '1') return '';
   if (props.subSeasons.length > 0) {
@@ -225,7 +227,17 @@ function imageUrl(url?: any) {
           style="color: hsl(var(--card-foreground))"
           :title="displayTitle"
         >
-          {{ displayTitle }}
+          <a
+            v-if="detailUrl"
+            :href="detailUrl"
+            target="_blank"
+            rel="noopener"
+            class="transition-colors hover:underline hover:decoration-1 hover:underline-offset-4"
+            style="color: inherit"
+          >
+            {{ displayTitle }}
+          </a>
+          <template v-else>{{ displayTitle }}</template>
           <span
             v-if="detail.year"
             class="ml-1 text-sm font-normal sm:text-base"
