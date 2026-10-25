@@ -190,6 +190,25 @@ function applyPreset() {
 
 let loadSeq = 0;
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error('discovery request timeout')),
+      ms,
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 async function loadItems(reset = false) {
   if (!activeProvider.value || !activeFeed.value) return;
   if (!reset && (loading.value || loadingMore.value)) return;
@@ -209,23 +228,26 @@ async function loadItems(reset = false) {
 
   try {
     const result = unwrap<DiscoveryApi.Page>(
-      await getDiscoveryItemsApi({
-        provider,
-        feed,
-        page: page.value,
-        filters: {
-          ...(supportsSeason.value ? { season: selectedSeason.value } : {}),
-          ...(supportsYear.value && selectedYear.value
-            ? { year: selectedYear.value }
-            : {}),
-          ...(supportsWeekday.value && selectedWeekday.value
-            ? { weekday: selectedWeekday.value }
-            : {}),
-          ...(supportsGenre.value && selectedGenre.value
-            ? { genre: selectedGenre.value }
-            : {}),
-        },
-      }),
+      await withTimeout(
+        getDiscoveryItemsApi({
+          provider,
+          feed,
+          page: page.value,
+          filters: {
+            ...(supportsSeason.value ? { season: selectedSeason.value } : {}),
+            ...(supportsYear.value && selectedYear.value
+              ? { year: selectedYear.value }
+              : {}),
+            ...(supportsWeekday.value && selectedWeekday.value
+              ? { weekday: selectedWeekday.value }
+              : {}),
+            ...(supportsGenre.value && selectedGenre.value
+              ? { genre: selectedGenre.value }
+              : {}),
+          },
+        }),
+        30000,
+      ),
     );
     if (seq !== loadSeq) return;
     if (supportsGenre.value) {
@@ -265,6 +287,11 @@ async function loadItems(reset = false) {
       return true;
     });
     hasMore.value = Boolean(result?.has_more);
+  } catch {
+    // 超时/失败时停止无限滚动，避免底部一直显示加载中。
+    if (seq === loadSeq) {
+      hasMore.value = false;
+    }
   } finally {
     if (seq === loadSeq) {
       loading.value = false;
