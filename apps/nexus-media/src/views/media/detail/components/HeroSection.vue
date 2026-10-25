@@ -206,10 +206,8 @@ function imageUrl(url?: any) {
                   : '电视剧')
             }}
           </NTag>
-        </div>
-
-        <div v-if="contentCode" class="mb-2">
           <NTag
+            v-if="contentCode"
             size="small"
             :bordered="false"
             class="font-mono tracking-wide"
@@ -223,7 +221,7 @@ function imageUrl(url?: any) {
         </div>
 
         <h1
-          class="mb-3 line-clamp-3 max-w-4xl text-xl font-semibold leading-snug tracking-tight break-words sm:text-2xl"
+          class="mb-3 line-clamp-3 max-w-4xl text-lg font-medium leading-relaxed break-words sm:text-xl"
           style="color: hsl(var(--card-foreground))"
           :title="displayTitle"
         >
