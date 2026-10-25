@@ -75,8 +75,6 @@ const tmdbUrl = computed(() => {
   return `https://www.themoviedb.org/${base}/${tid}`;
 });
 
-const detailUrl = computed(() => props.detail.link || tmdbUrl.value);
-
 const genresText = computed(() =>
   Array.isArray(props.detail.genres)
     ? props.detail.genres.join(' / ')
@@ -225,23 +223,15 @@ function imageUrl(url?: any) {
         </div>
 
         <h1
-          class="mb-2 line-clamp-3 text-2xl font-bold sm:text-3xl md:text-4xl"
+          class="mb-3 line-clamp-3 max-w-4xl text-xl font-semibold leading-snug tracking-tight break-words sm:text-2xl"
           style="color: hsl(var(--card-foreground))"
           :title="displayTitle"
         >
-          <a
-            v-if="detailUrl"
-            :href="detailUrl"
-            target="_blank"
-            rel="noopener"
-            class="hover:underline"
-          >
-            {{ displayTitle }}
-          </a>
-          <template v-else>{{ displayTitle }}</template>
+          {{ displayTitle }}
           <span
             v-if="detail.year"
-            class="text-lg font-normal opacity-70 sm:text-xl md:text-2xl"
+            class="ml-1 text-sm font-normal sm:text-base"
+            style="color: hsl(var(--muted-foreground))"
             >({{ detail.year }})</span
           >
         </h1>
