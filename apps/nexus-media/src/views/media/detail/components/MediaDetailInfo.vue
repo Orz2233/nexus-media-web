@@ -79,11 +79,18 @@ const overviewStyle = computed(() =>
       style="background: hsl(var(--card)); border-color: hsl(var(--border))"
     >
       <div v-if="actors.length > 0" class="mb-4">
-        <div
-          class="mb-2 text-sm font-medium"
-          style="color: hsl(var(--card-foreground))"
-        >
-          演员
+        <div class="mb-2 flex items-center gap-2">
+          <IconifyIcon
+            icon="lucide:users"
+            class="size-4"
+            style="color: hsl(var(--primary))"
+          />
+          <div
+            class="text-sm font-medium"
+            style="color: hsl(var(--card-foreground))"
+          >
+            演员
+          </div>
         </div>
         <div class="flex flex-wrap gap-2">
           <NTag v-for="name in actors" :key="name" size="small">
@@ -92,11 +99,18 @@ const overviewStyle = computed(() =>
         </div>
       </div>
       <div v-if="genres.length > 0">
-        <div
-          class="mb-2 text-sm font-medium"
-          style="color: hsl(var(--card-foreground))"
-        >
-          标签
+        <div class="mb-2 flex items-center gap-2">
+          <IconifyIcon
+            icon="lucide:tags"
+            class="size-4"
+            style="color: hsl(var(--primary))"
+          />
+          <div
+            class="text-sm font-medium"
+            style="color: hsl(var(--card-foreground))"
+          >
+            标签
+          </div>
         </div>
         <div class="flex flex-wrap gap-2">
           <NTag
