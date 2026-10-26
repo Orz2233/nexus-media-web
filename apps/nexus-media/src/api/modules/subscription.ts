@@ -321,3 +321,78 @@ export async function getTvSubscriptionItemsApi() {
     Array<{ id: string; name?: string; rssid: string; season?: string }>
   >('/subscription/tv/items');
 }
+
+export interface CustomRssSource {
+  id: number;
+  ref: string;
+  name: string;
+  url: string;
+  domain: string;
+  enabled: boolean;
+  proxy: boolean;
+  cookie?: null | string;
+  headers?: null | string;
+  last_fetch_at?: null | string;
+  last_success_at?: null | string;
+  last_error?: null | string;
+  item_count: number;
+  health: 'disabled' | 'error' | 'ok';
+  created_at?: null | string;
+  updated_at?: null | string;
+}
+
+export interface CustomRssSourcePayload {
+  id?: number;
+  name?: string;
+  url?: string;
+  enabled?: boolean;
+  proxy?: boolean;
+  cookie?: string;
+  headers?: string;
+}
+
+export interface CustomRssFeedItem {
+  title: string;
+  enclosure: string;
+  link: string;
+  size: number;
+  description: string;
+  pubdate: number | string;
+  category: string;
+  guid: string;
+}
+
+export interface CustomRssTestResult {
+  feed_type: string;
+  item_count: number;
+  download_count: number;
+  missing_download_count: number;
+  elapsed_ms: number;
+  items: CustomRssFeedItem[];
+}
+
+export async function getCustomRssSourcesApi() {
+  return requestClient.get<CustomRssSource[]>('/site/rss-sources');
+}
+
+export async function createCustomRssSourceApi(data: CustomRssSourcePayload) {
+  return requestClient.post<CustomRssSource>('/site/rss-sources', data);
+}
+
+export async function updateCustomRssSourceApi(
+  id: number,
+  data: CustomRssSourcePayload,
+) {
+  return requestClient.put<CustomRssSource>(`/site/rss-sources/${id}`, data);
+}
+
+export async function deleteCustomRssSourceApi(id: number) {
+  return requestClient.delete<boolean>(`/site/rss-sources/${id}`);
+}
+
+export async function testCustomRssSourceApi(data: CustomRssSourcePayload) {
+  return requestClient.post<CustomRssTestResult>(
+    '/site/rss-sources/test',
+    data,
+  );
+}

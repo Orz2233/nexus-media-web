@@ -79,7 +79,6 @@ const filterRules = ref<{ label: string; value: string }[]>([]);
 const downloadSettings = ref<{ label: string; value: string }[]>([]);
 const downloadDirs = ref<{ label: string; value: string }[]>([]);
 const loading = ref(false);
-const optionsLoaded = ref(false);
 
 const seasonOptions = Array.from({ length: 51 }, (_, i) =>
   i === 0
@@ -131,11 +130,8 @@ const profileLabel = computed(
 
 watch([() => props.show, () => props.item], async ([visible, item]) => {
   if (visible && item) {
-    // 先加载站点选项，再用其校验默认站点，避免默认 rss_sites/search_sites 被空选项过滤掉
-    if (!optionsLoaded.value) {
-      await loadOptions();
-      optionsLoaded.value = true;
-    }
+    // 每次打开刷新站点选项，确保新增/停用的自定义 RSS 立即生效
+    await loadOptions();
     form.value = {
       name: item.name,
       year: item.year || '',
@@ -197,7 +193,10 @@ async function loadOptions() {
       : visibleRes?.data || [];
     rssSites.value = visibleSites
       .filter((s: any) => (s.permissions || []).includes('rss'))
-      .map((s: any) => ({ label: s.name, value: s.name }));
+      .map((s: any) => ({
+        label: s.source === 'custom_rss' ? `${s.name}（自定义 RSS）` : s.name,
+        value: s.value || s.name,
+      }));
     searchSites.value = visibleSites
       .filter((s: any) => (s.permissions || []).includes('search'))
       .map((s: any) => ({ label: s.name, value: s.name }));

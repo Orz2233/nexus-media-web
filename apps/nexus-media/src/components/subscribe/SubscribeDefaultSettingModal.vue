@@ -43,7 +43,6 @@ const rssSites = ref<{ label: string; value: string }[]>([]);
 const searchSites = ref<{ label: string; value: string }[]>([]);
 const filterRules = ref<{ label: string; value: string }[]>([]);
 const downloadSettings = ref<{ label: string; value: string }[]>([]);
-const optionsLoaded = ref(false);
 
 const form = ref({
   over_edition: '0',
@@ -68,10 +67,7 @@ watch(
   () => props.show,
   async (visible) => {
     if (!visible) return;
-    if (!optionsLoaded.value) {
-      await loadOptions();
-      optionsLoaded.value = true;
-    }
+    await loadOptions();
     await loadSettings();
   },
 );
@@ -90,7 +86,10 @@ async function loadOptions() {
       : visibleRes?.data || [];
     rssSites.value = visibleSites
       .filter((s: any) => (s.permissions || []).includes('rss'))
-      .map((s: any) => ({ label: s.name, value: s.name }));
+      .map((s: any) => ({
+        label: s.source === 'custom_rss' ? `${s.name}（自定义 RSS）` : s.name,
+        value: s.value || s.name,
+      }));
     searchSites.value = visibleSites
       .filter((s: any) => (s.permissions || []).includes('search'))
       .map((s: any) => ({ label: s.name, value: s.name }));
