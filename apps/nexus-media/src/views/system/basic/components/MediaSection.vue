@@ -93,6 +93,8 @@ const rmtModes = [
           <NFormItem label="TMDB API Key">
             <NInput
               :value="config['app.rmt_tmdbkey']"
+              type="password"
+              show-password-on="click"
               placeholder="必填"
               @update:value="(v) => emit('updateConfig', 'app.rmt_tmdbkey', v)"
             />
