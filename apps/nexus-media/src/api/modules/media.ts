@@ -40,6 +40,101 @@ export namespace MediaApi {
     tmdbid?: number;
     params?: Record<string, any>;
   }
+  export interface MediaServerOption {
+    id: number;
+    name: string;
+    type: string;
+    is_default: boolean;
+  }
+
+  export interface LibrarySection {
+    server: MediaServerOption;
+    server_id: number;
+    server_name: string;
+    server_success: boolean;
+    sync_state: string;
+    media_counts: Record<string, number | string>;
+    librarys: Record<string, any>[];
+    resumes: Record<string, any>[];
+    latests: Record<string, any>[];
+    activitys: Record<string, any>[];
+  }
+
+  export interface LibraryHome {
+    server_success: boolean;
+    servers: MediaServerOption[];
+    sections: LibrarySection[];
+    media_counts: Record<string, number | string>;
+    user_count: number;
+    library_spaces: Record<string, any>;
+    librarys: Record<string, any>[];
+    resumes: Record<string, any>[];
+    latests: Record<string, any>[];
+    activitys: Record<string, any>[];
+  }
+
+  export interface LibraryRoute {
+    id?: number;
+    content_profile: string;
+    target_path?: null | string;
+    server_id: number;
+    server_name?: string;
+    library_id?: null | string;
+    enabled: boolean;
+    note?: string;
+  }
+}
+
+/** 获取启用的媒体服务器实例 */
+export async function getLibraryServersApi() {
+  return requestClient.post<MediaApi.MediaServerOption[]>(
+    '/media/library/servers',
+    {},
+  );
+}
+
+/** 获取指定实例的媒体库列表 */
+export async function getMediaLibrariesApi(serverId?: number) {
+  return requestClient.post<Record<string, any>[]>('/media/library/libraries', {
+    server_id: serverId,
+  });
+}
+
+/** 同步指定实例的媒体库 */
+export async function syncMediaLibrariesApi(params: {
+  server_id: number;
+  librarys: string[];
+}) {
+  return requestClient.post('/media/sync/start', params);
+}
+
+/** 通知指定实例扫描媒体库 */
+export async function refreshMediaLibraryApi(serverId: number) {
+  return requestClient.post('/media/library/refresh', {
+    server_id: serverId,
+  });
+}
+
+/** 获取内容画像媒体库路由 */
+export async function getLibraryRoutesApi() {
+  return requestClient.post<MediaApi.LibraryRoute[]>(
+    '/media/library/routes',
+    {},
+  );
+}
+
+/** 保存内容画像媒体库路由 */
+export async function saveLibraryRouteApi(data: MediaApi.LibraryRoute) {
+  const updating = Boolean(data.id);
+  return requestClient.post<MediaApi.LibraryRoute>(
+    updating ? '/media/library/routes/update' : '/media/library/routes/save',
+    data,
+  );
+}
+
+/** 删除内容画像媒体库路由 */
+export async function deleteLibraryRouteApi(id: number) {
+  return requestClient.post('/media/library/routes/delete', { id });
 }
 
 /** 搜索媒体 */
@@ -98,10 +193,10 @@ export async function getMediaDetailByRefApi(
 }
 
 /** 获取媒体库首页数据（libraries/resumes/latests/stats） */
-export async function getLibraryHomeApi() {
-  return requestClient.post<Record<string, any>>(
+export async function getLibraryHomeApi(serverId?: number) {
+  return requestClient.post<MediaApi.LibraryHome>(
     '/media/library/home',
-    {},
+    { server_id: serverId },
     { timeout: 120_000 },
   );
 }
