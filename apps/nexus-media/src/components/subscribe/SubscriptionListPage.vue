@@ -321,7 +321,6 @@ async function fetchData() {
         ? await getMovieSubscriptionApi(undefined, filterProfile)
         : await getTvSubscriptionApi(undefined, filterProfile);
     const list = Array.isArray(res) ? res : res?.data || [];
-    await backfillMissingPosters(list);
     items.value = list;
     if (profile === 'default' || profile === 'all') {
       if (props.mediaType === 'movie') {
@@ -330,6 +329,8 @@ async function fetchData() {
         subscriptionStore.setTvSubscriptions(list);
       }
     }
+    // 先展示列表，缺失海报在后台补全，避免慢源阻塞整页
+    void backfillMissingPosters(list);
   } catch (error: any) {
     notification.error('加载订阅失败', {
       description: error?.message || '',
