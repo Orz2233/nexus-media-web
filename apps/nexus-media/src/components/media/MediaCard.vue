@@ -2,7 +2,7 @@
 import type { SubscribeConfirmItem } from '#/components/subscribe/SubscribeConfirmModal.vue';
 import type { SubscribeEditItem } from '#/components/subscribe/SubscribeEditModal.vue';
 
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { IconifyIcon } from '@vben/icons';
@@ -97,6 +97,43 @@ const typeLabel = computed(() => {
 const posterUrl = computed(() =>
   getImgUrl(getContentProfileImageUrl(props.contentProfile, props.poster)),
 );
+const posterEl = ref<HTMLImageElement | null>(null);
+const posterSrc = ref('');
+let posterObserver: IntersectionObserver | null = null;
+
+function revealPoster() {
+  posterSrc.value = posterUrl.value;
+}
+
+onMounted(() => {
+  // 卡片先渲染榜单数据，封面等接近可视区后再请求，避免首屏被图片下载占满。
+  const el = posterEl.value;
+  if (!el || typeof IntersectionObserver === 'undefined') {
+    revealPoster();
+    return;
+  }
+  posterObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        posterObserver?.disconnect();
+        posterObserver = null;
+        revealPoster();
+      }
+    },
+    { rootMargin: '240px 0px' },
+  );
+  posterObserver.observe(el);
+});
+
+watch(posterUrl, (url) => {
+  if (posterSrc.value || !posterObserver) posterSrc.value = url;
+});
+
+onUnmounted(() => {
+  posterObserver?.disconnect();
+  posterObserver = null;
+});
+
 const posterPosition = computed(
   () => getContentProfilePosterPosition(props.contentProfile) || '50% 50%',
 );
@@ -360,10 +397,13 @@ function onImgError(e: Event) {
   >
     <div class="aspect-[2/3]" style="background: hsl(var(--muted))">
       <img
-        :src="posterUrl"
+        ref="posterEl"
+        :src="posterSrc || undefined"
         class="w-full h-full object-cover"
         :style="{ objectPosition: posterPosition }"
         alt=""
+        loading="lazy"
+        decoding="async"
         @error="onImgError"
       />
     </div>

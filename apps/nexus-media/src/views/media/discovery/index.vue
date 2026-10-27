@@ -666,11 +666,13 @@ watch(
 );
 
 onMounted(async () => {
-  await Promise.all([loadSources(), loadSubscriptionIndex()]);
+  // 榜单数据优先：订阅状态只影响卡片角标，等首屏数据渲染后再后台加载。
+  await loadSources();
   await loadItems(true);
   await nextTick();
   setupLoadMoreObserver();
   window.addEventListener('scroll', handleScrollForLoadMore, true);
+  void loadSubscriptionIndex();
 });
 
 onUnmounted(() => {
